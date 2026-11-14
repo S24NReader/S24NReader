@@ -418,6 +418,7 @@ const CONFIG = {
   // رابط خادم الجلب (Cloudflare Worker) بلا / في النهاية
   WORKER_URL: 'https://s24nreader-proxy.s24nreader.workers.dev',
   AI_URL: 'https://s24nreader-ai.s24nreader.workers.dev',   // خادم التلخيص الذكي (Gemini)
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbw8_DzpP6jCHdXvOZetYAKke7Dgyf2YrWkqTL-qvSQyxvcmj7tZyvvuiTccOjhwuyS3FA/exec',   // خادم الجلب الاحتياطي (Google Apps Script) للمواقع التي تحجب Cloudflare
   // ضع هنا كائن الإعدادات من Firebase Console لتفعيل الحسابات والمزامنة.
   // إن تُرك null يعمل التطبيق في "وضع محلي" (بيانات هذا المتصفح فقط).
   FIREBASE: {
@@ -593,13 +594,27 @@ const IDB = {
 async function fetchText(url) {
   const w = workerUrl();
   if (!w) throw new Error('لم يُضبط خادم الجلب بعد (الإعدادات ← خادم الجلب)');
+  if (CONFIG.GAS_URL && GAS_HOSTS.has(hostOf(url))) return fetchViaGas(url);
   const r = await fetch(`${w}/fetch?url=${encodeURIComponent(url)}`);
   if (!r.ok) {
     let j = {}; try { j = await r.json(); } catch {}
     const map = { invalid_url: 'رابط غير صالح', upstream_status: 'الموقع أعاد خطأ ' + (j.status || ''), fetch_failed: 'تعذّر الوصول إلى الموقع', too_large: 'الصفحة كبيرة جداً', unsupported_type: 'نوع محتوى غير مدعوم', origin_not_allowed: 'هذا النطاق غير مسموح في خادم الجلب' };
+     if (CONFIG.GAS_URL && j.error === 'upstream_status' && [401, 403, 429, 503].includes(j.status)) {
+      const res = await fetchViaGas(url);
+      GAS_HOSTS.add(hostOf(url)); lsSet('s24r_gas_hosts', [...GAS_HOSTS]);
+      return res;
+    }
     throw new Error(map[j.error] || ('خطأ ' + r.status));
   }
   return { text: await r.text(), finalUrl: r.headers.get('X-Final-Url') || url };
+}
+// المواقع التي تحجب خادم Cloudflare تُجلب عبر خادم Google الاحتياطي
+const GAS_HOSTS = new Set(lsGet('s24r_gas_hosts', []));
+async function fetchViaGas(url) {
+  const r = await fetch(`${CONFIG.GAS_URL}?url=${encodeURIComponent(url)}`);
+  let j = {}; try { j = await r.json(); } catch {}
+  if (!j.ok) throw new Error(j.status ? 'الموقع أعاد خطأ ' + j.status : 'تعذّر الوصول إلى الموقع');
+  return { text: j.text, finalUrl: url };
 }
 
 const absUrl = (u, base) => { try { const x = new URL(u, base); return /^https?:$/.test(x.protocol) ? x.href : ''; } catch { return ''; } };
