@@ -159,7 +159,7 @@ body.feed-dragging .nav-i:hover{background:none}
 .art h1 a{color:var(--tx);text-decoration:none}
 .art h1 a:hover{color:var(--ac)}
 .art-meta{color:var(--tx3);font-size:13px;margin-bottom:20px}
-.art-body{font-size:17.5px;line-height:1.95}
+.art-body{font-family:var(--rf,inherit);font-size:var(--rs,17.5px);line-height:var(--rl,1.95)}
 .art-body img,.art-body video{max-width:100%;height:auto;border-radius:8px}
 .art-body figure{margin:16px 0}
 .art-body figcaption{font-size:13px;color:var(--tx3)}
@@ -267,6 +267,69 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
   .hide-m{display:none!important}
 }
 @media (min-width:761px){ .only-m{display:none!important} }
+/* ---------- وحدة المقالة ---------- */
+.r-x,.r-nav{display:none}
+.r-bar .ibtn.on{color:var(--ac)}
+.r-share{display:inline-flex;gap:0}
+.r-share .ibtn{color:var(--tx3)} .r-share .ibtn:hover{color:var(--tx)}
+.r-prog{position:relative;width:30px;height:30px;display:inline-grid;place-items:center;margin:0 4px;color:var(--tx3);font-size:9.5px;font-variant-numeric:tabular-nums}
+.r-prog svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.r-prog circle{fill:none;stroke:var(--line);stroke-width:3}
+.r-prog circle.v{stroke:var(--ac);stroke-dasharray:94.25;transition:stroke-dashoffset .2s}
+.r-prog.done{color:var(--ac);font-size:13px}
+.r-prog b{position:relative;font-weight:600}
+.art-tags{display:flex;flex-wrap:wrap;gap:6px;margin:-8px 0 16px}
+.tagchip{display:inline-flex;align-items:center;gap:4px;background:var(--ac2);color:var(--ac3);border-radius:20px;padding:2px 6px 2px 10px;font-size:13px;cursor:pointer}
+.tagchip .ico{width:13px;height:13px}
+.tagchip button{width:18px;height:18px;display:grid;place-items:center;border-radius:50%;color:inherit;opacity:.6}
+.tagchip button:hover{opacity:1;background:rgba(0,0,0,.08)}
+.art-note2{border:1px solid var(--line);border-right:3px solid var(--later,#d9a400);border-radius:8px;padding:10px 14px;margin:0 0 16px;background:var(--bg)}
+.art-note2 .nh{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--tx3);margin-bottom:4px}
+.art-note2 .nh b{color:var(--tx)} .art-note2 .sp{flex:1}
+.art-note2 .nt{white-space:pre-wrap;font-size:15px;line-height:1.8}
+.sum-row{margin:0 0 14px}
+.sum-btn{border-color:var(--ac);color:var(--ac)}
+.sum-btn.busy .ico{animation:spin 1.2s linear infinite}
+.sum-box{border:1px solid var(--ac);background:var(--ac2);border-radius:10px;padding:12px 16px;margin:0 0 18px;font-size:15.5px;line-height:1.85}
+.sum-box .sh{display:flex;align-items:center;gap:7px;color:var(--ac3);font-size:13px;margin-bottom:4px}
+.sum-box .sh span{color:var(--tx3);font-size:12px;margin-inline-start:auto}
+.sum-box ul{margin:4px 0 0;padding-inline-start:20px} .sum-box p{margin:4px 0}
+.tagpop{position:fixed;z-index:60;width:300px;max-height:420px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px}
+.tagpop .tp-h{font-weight:600;margin:2px 4px 8px}
+.tagpop .tp-l{overflow:auto;margin-top:8px}
+.tagpop .tp-i{display:flex;width:100%;align-items:center;gap:9px;padding:7px 10px;border-radius:7px;text-align:right}
+.tagpop .tp-i:hover{background:var(--hover)}
+.tagpop .tp-i.on{color:var(--ac);font-weight:600}
+.tagpop .tp-i.new{color:var(--ac)}
+.tagpop .tp-s{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tx3);margin:8px 6px 2px}
+.tagpop .tp-s .ico{width:14px;height:14px}
+.tagpop .tp-e{color:var(--tx3);font-size:13px;padding:8px}
+.mt-r{display:grid;grid-template-columns:130px 1fr;gap:12px;padding:9px 0;border-bottom:1px solid var(--line2,var(--line))}
+.mt-k{color:var(--tx3);font-size:13px;font-weight:500}
+.mt-v{font-size:14px;min-width:0}
+.mt-v a{color:var(--ac);font-size:13px}
+.note-by{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+/* النافذة المنبثقة في وضع البطاقات */
+.main.cards-mode.reading .list{display:flex}
+.main.cards-mode.reading .reader{display:block;position:fixed;inset:0;z-index:45;background:rgba(10,15,12,.55);overflow:auto;padding:22px 74px;animation:fade .12s}
+.main.cards-mode.reading .r-wrap{max-width:920px;margin:0 auto;background:var(--panel);border-radius:14px;box-shadow:var(--shadow);min-height:100%}
+.main.cards-mode.reading .r-bar{border-radius:14px 14px 0 0;top:-22px}
+.main.cards-mode .r-back{display:none}
+.main.cards-mode.reading .r-x{display:grid;position:fixed;top:18px;left:18px;z-index:46;width:40px;height:40px;place-items:center;border-radius:50%;color:#fff;background:rgba(255,255,255,.12)}
+.main.cards-mode.reading .r-nav{display:grid;position:fixed;top:50%;transform:translateY(-50%);z-index:46;width:48px;height:48px;place-items:center;border-radius:50%;color:#fff;background:rgba(255,255,255,.12)}
+.main.cards-mode.reading .r-nav .ico,.main.cards-mode.reading .r-x .ico{width:24px;height:24px}
+.main.cards-mode.reading .r-nav:hover,.main.cards-mode.reading .r-x:hover{background:rgba(255,255,255,.25)}
+.main.cards-mode.reading .r-nav.prev{right:14px}
+.main.cards-mode.reading .r-nav.next{left:14px}
+@media (max-width:760px){
+  .main.cards-mode.reading .reader{padding:0}
+  .main.cards-mode.reading .r-wrap{border-radius:0}
+  .main.cards-mode.reading .r-bar{border-radius:0;top:0}
+  .main.cards-mode.reading .r-nav,.main.cards-mode.reading .r-x{display:none}
+  .main.cards-mode .r-back{display:grid}
+  .tagpop{width:calc(100vw - 16px)}
+  .mt-r{grid-template-columns:100px 1fr}
+}
 </style>
 </head>
 <body>
@@ -328,6 +391,19 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
   <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
   <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-chl" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></symbol>
+  <symbol id="i-xl" viewBox="0 0 24 24"><path d="M4 4h4.5L20 20h-4.5zM20 4l-6.6 7.5M4 20l6.6-7.5"/></symbol>
+  <symbol id="i-fb" viewBox="0 0 24 24"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v3H7v4h3v6h4v-6h3l1-4h-4V8z"/></symbol>
+  <symbol id="i-wa" viewBox="0 0 24 24"><path d="M3 21l1.6-4.6A8.5 8.5 0 1 1 8 19.6z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 1c-1-.5-2-1.5-2.5-2.5l1-1-1-2z"/></symbol>
+  <symbol id="i-tg" viewBox="0 0 24 24"><path d="M21 4 3 11l6 2 2 6 3-4 5 4z"/><path d="m9 13 8-6"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5z"/><path d="M14 3v5h5M8 13h8M8 17h5"/></symbol>
+  <symbol id="i-type" viewBox="0 0 24 24"><path d="M4 18 8.5 6 13 18M5.7 14h5.6M15 18v-6.5a2.5 2.5 0 0 1 5 0V18M15 14.5h5"/></symbol>
+  <symbol id="i-print" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></symbol>
   <symbol id="i-unread" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></symbol>
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
   <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
@@ -341,6 +417,7 @@ const CONFIG = {
   APP_NAME: 'S24NReader',
   // رابط خادم الجلب (Cloudflare Worker) بلا / في النهاية
   WORKER_URL: 'https://s24nreader-proxy.s24nreader.workers.dev',
+  AI_URL: 'https://s24nreader-ai.s24nreader.workers.dev',   // خادم التلخيص الذكي (Gemini)
   // ضع هنا كائن الإعدادات من Firebase Console لتفعيل الحسابات والمزامنة.
   // إن تُرك null يعمل التطبيق في "وضع محلي" (بيانات هذا المتصفح فقط).
   FIREBASE: {
@@ -426,7 +503,7 @@ const workerUrl = () => (CONFIG.WORKER_URL || lsGet('s24r_worker', '') || '').re
 
 /* ---------- الحالة ---------- */
 const DEFAULT_SETTINGS = { theme: 'auto', refreshMin: 15, autoRead: true, view: 'list', listFilter: 'unread', sort: 'new' };
-let S = { folders: {}, feeds: {}, rules: {}, states: {}, saved: {}, drafts: {}, settings: { ...DEFAULT_SETTINGS } };
+let S = { folders: {}, feeds: {}, rules: {}, states: {}, saved: {}, drafts: {}, tags: {}, itags: {}, notes: {}, settings: { ...DEFAULT_SETTINGS } };
 const ITEMS = new Map();          // id → مقالة
 const FEED_STATUS = {};           // feedId → {fetchedAt, error, loading}
 const FULLTEXT = new Map();       // id → html
@@ -461,10 +538,10 @@ const Store = {
         await this.db.ref('users/' + USER.uid).set(d);
         lsSet('s24r_state_local_migrated', local); localStorage.removeItem('s24r_state_local');
         setTimeout(() => toast('نُقلت مصادرك وفلاترك من الوضع المحلي إلى حسابك'), 800);
-      } S = { folders: {}, feeds: {}, rules: {}, states: {}, saved: {}, drafts: {}, ...d };
+      } S = { folders: {}, feeds: {}, rules: {}, states: {}, saved: {}, drafts: {}, tags: {}, itags: {}, notes: {}, ...d };
       S.settings = { ...DEFAULT_SETTINGS, ...(d.settings || {}) };
       // مزامنة حية بين الأجهزة
-      ['folders', 'feeds', 'rules', 'states', 'saved', 'drafts', 'settings'].forEach(k => {
+      ['folders', 'feeds', 'rules', 'states', 'saved', 'drafts', 'tags', 'itags', 'notes', 'settings'].forEach(k => {
         let first = true;
         this.db.ref(`users/${USER.uid}/${k}`).on('value', s => {
           if (first) { first = false; return; }
@@ -562,6 +639,7 @@ function parseFeedXml(x, url) {
         html: content ? content.textContent : '',
         author: txt(byName(byName(e, 'author') || e, 'name')),
         image: mediaImage(e, url),
+        cats: allByName(e, 'category').map(c => c.getAttribute('term') || c.getAttribute('label') || txt(c)).filter(Boolean).slice(0, 12),
       });
     }
   } else {
@@ -577,6 +655,7 @@ function parseFeedXml(x, url) {
         html: (enc && enc.textContent.length > (desc ? desc.textContent.length : 0)) ? enc.textContent : (desc ? desc.textContent : ''),
         author: txt(byName(e, 'creator')) || txt(byName(e, 'author')),
         image: mediaImage(e, url),
+        cats: allByName(e, 'category').map(c => txt(c)).filter(Boolean).slice(0, 12),
       });
     }
   }
@@ -717,7 +796,7 @@ async function refreshFeed(feedId) {
       const item = {
         id, feedId, title: r.title || '(بلا عنوان)', link: r.link, author: r.author || '',
         date: isNaN(r.date) ? firstSeen : Math.min(r.date, now + 3600e3), firstSeen,
-        html, text: plain(html).slice(0, 400), image: bigImg(r.image || firstImg(html, r.link || finalUrl)),
+        html, text: plain(html).slice(0, 400), image: bigImg(r.image || firstImg(html, r.link || finalUrl)), cats: [...new Set(r.cats || [])],
       };
       if (!prev) fresh.push(item);
       prevMap.set(id, item);
@@ -817,13 +896,13 @@ const isHidden = it => matchRules(it).some(r => r.action === 'hide');
    ========================================================= */
 const st = id => S.states[id] || {};
 const isRead = id => !!st(id).r;
-function snapshot(it) { return { id: it.id, feedId: it.feedId, title: it.title, link: it.link, date: it.date, image: it.image || '', author: it.author || '', text: it.text || '', html: (it.html || '').slice(0, 30000), feedTitle: (S.feeds[it.feedId] || {}).title || '' }; }
+function snapshot(it) { return { id: it.id, feedId: it.feedId, title: it.title, link: it.link, date: it.date, image: it.image || '', author: it.author || '', cats: it.cats || [], firstSeen: it.firstSeen || 0, text: it.text || '', html: (it.html || '').slice(0, 30000), feedTitle: (S.feeds[it.feedId] || {}).title || '' }; }
 function getItem(id) { return ITEMS.get(id) || (S.saved && S.saved[id]) || null; }
 function setFlag(id, flag, on) {
   const it = getItem(id); if (!it) return;
   const s = { ...st(id) }; if (on) s[flag] = 1; else delete s[flag]; s.t = Date.now();
   const upd = { ['states/' + id]: Object.keys(s).length > 1 ? s : null };
-  if (flag === 's' || flag === 'l') upd['saved/' + id] = (s.s || s.l) ? snapshot(it) : null;
+  if (flag === 's' || flag === 'l') upd['saved/' + id] = (s.s || s.l || hasExtras(id)) ? snapshot(it) : null;
   Store.update(upd); scheduleRender();
 }
 const toggleFlag = (id, f) => setFlag(id, f, !st(id)[f]);
@@ -861,7 +940,9 @@ function unreadCounts() {
 
 function currentItems() {
   let list;
-  if (VIEW.type === 'starred' || VIEW.type === 'later') {
+  if (VIEW.type === 'tag') {
+    list = Object.entries(S.itags || {}).filter(([, t]) => t && t[VIEW.id]).map(([id]) => getItem(id)).filter(Boolean).map(it => ITEMS.get(it.id) || it);
+  } else if (VIEW.type === 'starred' || VIEW.type === 'later') {
     const f = VIEW.type === 'starred' ? 's' : 'l';
     list = Object.values(S.saved || {}).filter(it => st(it.id)[f]).map(it => ITEMS.get(it.id) || it);
   } else {
@@ -888,6 +969,7 @@ function viewTitle() {
   if (VIEW.type === 'folder') return (S.folders[VIEW.id] || {}).name || 'مجلد';
   if (VIEW.type === 'feed') return (S.feeds[VIEW.id] || {}).title || 'مصدر';
   if (VIEW.type === 'rule') return 'فلتر: ' + ((S.rules[VIEW.id] || {}).name || '');
+  if (VIEW.type === 'tag') return 'وسم: ' + ((S.tags[VIEW.id] || {}).name || '');
   return '';
 }
 
@@ -926,6 +1008,12 @@ function renderSide(force) {
       <span class="sw" style="background:${esc(r.color || '#999')}"></span><span class="lbl">${esc(r.name)}</span><span class="cnt">${n || ''}</span>
       <button class="more" data-act="rule-edit" data-id="${esc(rid)}" title="تعديل">${ico('pen')}</button></div>`; }).join('')
     : `<div class="nav-i" data-act="rule-new">${ico('filter')}<span class="lbl">أنشئ أول فلتر…</span></div>`;
+  const tags = tagsSorted();
+  if (tags.length) {
+    const tc = tagCounts();
+    h += `<h4>الوسوم</h4>` + tags.map(([tid, t]) => `<div class="nav-i${act('tag', tid)}" data-view="tag" data-id="${esc(tid)}">${ico('tag')}<span class="lbl">${esc(t.name)}</span><span class="cnt">${tc[tid] || ''}</span>
+      <button class="more" data-act="tag-menu" data-id="${esc(tid)}" title="خيارات">${ico('more')}</button></div>`).join('');
+  }
   h += `<h4>أدوات</h4><div class="nav-i" data-act="settings">${ico('gear')}<span class="lbl">الإعدادات</span></div>`;
   h += USER
     ? `<div class="side-foot acct"><span class="lbl" title="${esc(USER.email || '')}">${esc(USER.email || USER.displayName || '')}</span><button class="btn sm" data-act="logout">تسجيل الخروج</button></div>`
@@ -934,7 +1022,7 @@ function renderSide(force) {
 }
 
 function renderListHead() {
-  const isSaved = VIEW.type === 'starred' || VIEW.type === 'later', isDrafts = VIEW.type === 'drafts';
+  const isSaved = VIEW.type === 'starred' || VIEW.type === 'later' || VIEW.type === 'tag', isDrafts = VIEW.type === 'drafts';
   let h = `<h2>${esc(viewTitle())}${QUERY ? ` <small style="color:var(--tx3);font-weight:400">— بحث: ${esc(QUERY)}</small>` : ''}</h2>`;
   if (isDrafts) h += `<button class="btn sm" data-act="new-draft">${ico('plus')}مسودة</button>`;
   else {
@@ -942,6 +1030,7 @@ function renderListHead() {
     h += `<div class="seg" title="طريقة العرض"><button data-act="view-mode" data-v="list" class="${setting('view') !== 'cards' ? 'on' : ''}" title="قائمة">${ico('list')}</button><button data-act="view-mode" data-v="cards" class="${setting('view') === 'cards' ? 'on' : ''}" title="بطاقات">${ico('grid')}</button></div>`;
     if (!isSaved) h += `<button class="ibtn" data-act="mark-all" title="تعليم الكل كمقروء">${ico('checks')}</button>`;
     if (VIEW.type === 'feed') h += `<button class="ibtn" data-act="feed-menu" data-id="${esc(VIEW.id)}" title="خيارات المصدر">${ico('more')}</button>`;
+    if (VIEW.type === 'tag') h += `<button class="ibtn" data-act="tag-menu" data-id="${esc(VIEW.id)}" title="خيارات الوسم">${ico('more')}</button>`;
     if (VIEW.type === 'rule') h += `<button class="ibtn" data-act="rule-edit" data-id="${esc(VIEW.id)}" title="تعديل الفلتر">${ico('pen')}</button>`;
   }
   $('#list-h').innerHTML = h;
@@ -983,6 +1072,7 @@ function emptyState() {
   if (QUERY) return `<div class="empty">${ico('search')}<h3>لا نتائج</h3><div>لا توجد مقالات تطابق «${esc(QUERY)}».</div></div>`;
   if (VIEW.type === 'starred') return `<div class="empty">${ico('star')}<h3>لا مقالات مميّزة</h3><div>اضغط النجمة على أي مقالة (أو <span class="kbd">s</span>) لحفظها هنا.</div></div>`;
   if (VIEW.type === 'later') return `<div class="empty">${ico('clock')}<h3>القائمة فارغة</h3><div>احفظ ما تريد قراءته لاحقاً بالزر ${ico('clock')} أو <span class="kbd">l</span>.</div></div>`;
+  if (VIEW.type === 'tag') return `<div class="empty">${ico('tag')}<h3>لا مقالات بهذا الوسم</h3><div>أضف الوسم إلى أي مقالة من زر ${ico('tag')} في شريطها.</div></div>`;
   if (VIEW.type === 'rule') { const r = S.rules[VIEW.id] || {}; return `<div class="empty">${ico('filter')}<h3>لا مقالات مطابقة ${setting('listFilter') === 'unread' ? 'غير مقروءة ' : ''}حالياً</h3><div>يبحث هذا الفلتر عن: <b>${esc((r.keywords || []).join('، '))}</b><br>ستظهر هنا كل مقالة جديدة تطابقه.${setting('listFilter') === 'unread' ? ' <span class="lnk" data-act="lf" data-v="all">عرض المقروء أيضاً</span>' : ''}</div></div>`; }
   if (VIEW.type === 'feed' && FEED_STATUS[VIEW.id] && FEED_STATUS[VIEW.id].error) return `<div class="empty">${ico('rss')}<h3>تعذّر تحديث المصدر</h3><div>${esc(FEED_STATUS[VIEW.id].error)}</div><div style="margin-top:12px"><button class="btn" data-act="refresh-one" data-id="${esc(VIEW.id)}">إعادة المحاولة</button></div></div>`;
   if (setting('listFilter') === 'unread') return `<div class="empty">${ico('check')}<h3>قرأت كل شيء</h3><div>لا مقالات غير مقروءة هنا. <span class="lnk" data-act="lf" data-v="all">عرض الكل</span></div></div>`;
@@ -1010,26 +1100,300 @@ function _renderReader(r) {
   const body = full && full.html ? full.html : it.html;
   // الصورة الرئيسية تُعرض فقط إن لم يكن في نص المقالة صورة أصلاً (لتجنّب التكرار)
   const lead = /<img\s/i.test(body || '') ? '' : ((full && full.image) || it.image || '');
-  r.innerHTML = `<div class="r-bar">
+  const tg = itemTagIds(it.id), note = (S.notes || {})[it.id], sum = SUMS.get(it.id);
+  const u = encodeURIComponent(it.link || ''), t = encodeURIComponent(it.title || '');
+  const pr = PROG.get(it.id) || 0;
+  r.innerHTML = `<button class="r-x" data-act="close-reader" title="إغلاق (Esc)">${ico('x')}</button>
+    <button class="r-nav prev" data-act="prev-item" title="السابقة (k)">${ico('back')}</button>
+    <button class="r-nav next" data-act="next-item" title="التالية (j)">${ico('chl')}</button>
+    <div class="r-wrap"><div class="r-bar">
       <button class="ibtn r-back" data-act="close-reader" title="رجوع">${ico('back')}</button>
       <button class="ibtn${s.s ? ' on' : ''}" data-act="star" title="نجمة (s)" style="${s.s ? 'color:var(--star)' : ''}">${ico('star')}</button>
       <button class="ibtn${s.l ? ' on' : ''}" data-act="later" title="لاحقاً (l)" style="${s.l ? 'color:var(--later)' : ''}">${ico('clock')}</button>
       <button class="ibtn" data-act="toggle-read" title="${s.r ? 'تعليم كغير مقروء' : 'تعليم كمقروء'} (m)">${ico(s.r ? 'unread' : 'check')}</button>
+      <button class="ibtn${tg.length ? ' on' : ''}" data-act="tags-pop" title="وسوم المقالة (t)">${ico('tag')}</button>
       <button class="ibtn" data-act="to-draft" title="إرسال إلى الكتابة (d)">${ico('pen')}</button>
-      <button class="ibtn hide-m" data-act="copy-link" title="نسخ الرابط">${ico('copy')}</button>
+      <button class="ibtn" data-act="art-more" title="خيارات المقالة">${ico('more')}</button>
       <span class="sp"></span>
+      <span class="r-share hide-m">
+        <a class="ibtn" href="mailto:?subject=${t}&body=${t}%0A%0A${u}" title="إرسال بالبريد">${ico('mail')}</a>
+        <a class="ibtn" href="https://wa.me/?text=${t}%20${u}" target="_blank" rel="noopener" title="واتساب">${ico('wa')}</a>
+        <a class="ibtn" href="https://t.me/share/url?url=${u}&text=${t}" target="_blank" rel="noopener" title="تلغرام">${ico('tg')}</a>
+        <a class="ibtn" href="https://x.com/intent/post?text=${t}&url=${u}" target="_blank" rel="noopener" title="X">${ico('xl')}</a>
+        <a class="ibtn" href="https://www.facebook.com/sharer/sharer.php?u=${u}" target="_blank" rel="noopener" title="فيسبوك">${ico('fb')}</a>
+      </span>
+      <button class="ibtn" data-act="share-more" title="مشاركة وحفظ">${ico('share')}</button>
+      <span class="r-prog${pr >= .98 ? ' done' : ''}" title="تقدّم القراءة"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/><circle class="v" cx="18" cy="18" r="15" style="stroke-dashoffset:${94.25 * (1 - pr)}"/></svg><b>${pr >= .98 ? '✓' : Math.round(pr * 100)}</b></span>
       <button class="btn sm" data-act="fulltext" title="النص الكامل">${ico('doc')}<span class="t">${full ? 'النص الكامل ✓' : 'النص الكامل'}</span></button>
       <a class="btn sm" href="${esc(it.link)}" target="_blank" rel="noopener noreferrer">${ico('ext')}<span class="hide-m">الموقع الأصلي</span></a>
     </div>
-    <article class="art">
+    <article class="art" style="${readPrefsStyle()}">
       <div class="art-src"><img src="${esc(favicon(f.siteUrl || f.url || it.link))}" alt="" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"><span>${esc(f.title)}</span></div>
       <h1><a href="${esc(it.link)}" target="_blank" rel="noopener noreferrer">${esc(it.title)}</a></h1>
-      <div class="art-meta">${esc(fullDate(it.date))}${it.author ? ' · ' + esc(it.author) : ''}</div>
+      <div class="art-meta">${esc(fullDate(it.date))}${it.author ? ' · ' + esc(it.author) : ''} · ${readMinutes(it)} د قراءة</div>
+      ${tg.length ? `<div class="art-tags">${tg.map(tid => `<span class="tagchip" data-view="tag" data-id="${esc(tid)}">${ico('tag')}${esc(S.tags[tid].name)}<button data-act="untag" data-id="${esc(tid)}" title="إزالة الوسم">${ico('x')}</button></span>`).join('')}</div>` : ''}
+      ${note ? `<div class="art-note2"><div class="nh">${ico('note')}<b>${esc(note.by || 'ملاحظتي')}</b><span>${esc(fullDate(note.at))}</span><span class="sp"></span><button class="lnk" data-act="note">تعديل</button></div><div class="nt">${esc(note.text)}</div></div>` : ''}
+      <div class="sum-row"><button class="btn sm sum-btn${sum && sum.loading ? ' busy' : ''}" data-act="summarize">${ico('spark')}<span>${sum && sum.loading ? 'جارٍ التلخيص…' : sum && sum.text ? 'إخفاء الملخص' : 'تلخيص ذكي'}</span></button></div>
+      ${sum && sum.text && !sum.hidden ? `<div class="sum-box"><div class="sh">${ico('spark')}<b>الملخص الذكي</b><span>مولَّد آلياً، راجعه قبل الاعتماد عليه</span></div>${sumHtml(sum.text)}</div>` : ''}
       ${lead ? `<img class="art-lead" src="${esc(lead)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}
       <div class="art-body">${body || `<p style="color:var(--tx3)">لا يتضمن المصدر نص المقالة.</p>`}</div>
       ${!full ? `<div class="art-note">${ico('doc')}<span>هل يبدو النص مختصراً؟ يمكن جلب المقالة كاملة من موقعها.</span><button class="btn sm" data-act="fulltext">جلب النص الكامل</button></div>` : ''}
-    </article>`;
+    </article></div>`;
 }
+
+/* =========================================================
+   وحدة المقالة: الوسوم، الملاحظات، البيانات، شكل النص، المشاركة، التلخيص
+   ========================================================= */
+const PROG = new Map();   // تقدّم القراءة لكل مقالة (0..1)
+const SUMS = new Map(lsGet('s24r_sums', []));   // الملخصات المحفوظة في هذا المتصفح
+const saveSums = () => lsSet('s24r_sums', [...SUMS].filter(([, v]) => v.text).slice(-150).map(([k, v]) => [k, { text: v.text }]));
+const hasExtras = id => itemTagIds(id).length > 0 || !!(S.notes || {})[id];
+function itemTagIds(id) { const t = (S.itags || {})[id] || {}; return Object.keys(t).filter(k => t[k] && (S.tags || {})[k]); }
+function tagsSorted() { return Object.entries(S.tags || {}).sort((a, b) => (a[1].name || '').localeCompare(b[1].name || '', 'ar')); }
+function tagCounts() { const c = {}; for (const t of Object.values(S.itags || {})) for (const k in (t || {})) if (t[k]) c[k] = (c[k] || 0) + 1; return c; }
+// يحفظ نسخة من المقالة ما دام عليها نجمة أو «لاحقاً» أو وسم أو ملاحظة، كي تبقى بعد خروجها من الخلاصة
+function syncSaved(id) {
+  const it = getItem(id); if (!it) return; const s = st(id);
+  const need = !!(s.s || s.l || hasExtras(id)), has = !!(S.saved || {})[id];
+  if (need && !has) Store.write('saved/' + id, snapshot(it)); else if (!need && has) Store.write('saved/' + id, null);
+}
+function readMinutes(it) { const w = wordCount(it); return Math.max(1, Math.round(w / 200)); }
+function wordCount(it) { const f = FULLTEXT.get(it.id); return (plain((f && f.html) || it.html || '').match(/\S+/g) || []).length; }
+
+/* ---------- الوسوم ---------- */
+function setTag(id, tid, on) {
+  Store.update({ [`itags/${id}/${tid}`]: on ? 1 : null }); syncSaved(id); scheduleRender();
+}
+function createTag(name) {
+  name = name.trim().replace(/\s+/g, ' ').slice(0, 40); if (!name) return null;
+  const ex = Object.entries(S.tags || {}).find(([, t]) => normAr(t.name) === normAr(name)); if (ex) return ex[0];
+  const tid = uid(); Store.write('tags/' + tid, { name, at: Date.now() }); return tid;
+}
+function tagsPop(anchor) {
+  const it = SEL && getItem(SEL); if (!it) return;
+  document.querySelectorAll('.menu,.tagpop').forEach(m => m.remove());
+  const pop = document.createElement('div'); pop.className = 'tagpop';
+  pop.innerHTML = `<div class="tp-h">وسوم المقالة</div><input class="in" id="tp-q" placeholder="ابحث عن وسم أو أنشئ وسماً جديداً" autocomplete="off"><div class="tp-l"></div>`;
+  document.body.appendChild(pop);
+  const place = () => { const r = anchor.getBoundingClientRect(); pop.style.top = Math.min(r.bottom + 6, innerHeight - pop.offsetHeight - 8) + 'px'; pop.style.left = Math.max(8, Math.min(innerWidth - pop.offsetWidth - 8, r.left + r.width - pop.offsetWidth)) + 'px'; };
+  const q = $('#tp-q', pop), box = $('.tp-l', pop);
+  const draw = () => {
+    const qq = normAr(q.value.trim()), mine = new Set(itemTagIds(it.id));
+    const all = tagsSorted().filter(([, t]) => !qq || normAr(t.name).includes(qq));
+    const names = new Set(Object.values(S.tags || {}).map(t => normAr(t.name)));
+    const sugg = (it.cats || []).filter(c => !names.has(normAr(c)) && (!qq || normAr(c).includes(qq))).slice(0, 8);
+    let h = '';
+    if (q.value.trim() && !names.has(qq)) h += `<button class="tp-i new" data-new="${esc(q.value.trim())}">${ico('plus')}<span>إنشاء الوسم «${esc(q.value.trim())}»</span></button>`;
+    if (sugg.length) h += `<div class="tp-s">${ico('spark')}وسوم مقترحة من المصدر</div>` + sugg.map(c => `<button class="tp-i sug" data-new="${esc(c)}">${ico('tag')}<span>${esc(c)}</span></button>`).join('');
+    if (all.length) h += (sugg.length ? `<div class="tp-s">وسومك</div>` : '') + all.map(([tid, t]) => `<button class="tp-i${mine.has(tid) ? ' on' : ''}" data-tid="${esc(tid)}">${ico(mine.has(tid) ? 'check' : 'tag')}<span>${esc(t.name)}</span></button>`).join('');
+    if (!h) h = `<div class="tp-e">اكتب اسم وسم ثم اضغط Enter لإنشائه</div>`;
+    box.innerHTML = h; place();
+  };
+  const pick = b => {
+    if (!b) return;
+    if (b.dataset.tid) setTag(it.id, b.dataset.tid, !itemTagIds(it.id).includes(b.dataset.tid));
+    else if (b.dataset.new) { const tid = createTag(b.dataset.new); if (tid) setTag(it.id, tid, true); q.value = ''; }
+    draw(); q.focus();
+  };
+  box.addEventListener('click', e => pick(e.target.closest('.tp-i')));
+  q.addEventListener('input', draw);
+  q.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { close(); e.stopPropagation(); }
+    if (e.key === 'Enter') { e.preventDefault(); const v = q.value.trim(); if (!v) return; const ex = Object.entries(S.tags || {}).find(([, t]) => normAr(t.name) === normAr(v)); if (ex) { if (!itemTagIds(it.id).includes(ex[0])) setTag(it.id, ex[0], true); q.value = ''; draw(); } else pick({ dataset: { new: v } }); }
+  });
+  const out = e => { if (!pop.contains(e.target) && !anchor.contains(e.target)) close(); };
+  const close = () => { pop.remove(); document.removeEventListener('mousedown', out, true); };
+  setTimeout(() => document.addEventListener('mousedown', out, true));
+  draw(); setTimeout(() => q.focus(), 20);
+}
+async function tagMenu(anchor, tid) {
+  const t = (S.tags || {})[tid]; if (!t) return;
+  const k = await popMenu(anchor, [{ k: 'rename', icon: 'pen', label: 'إعادة التسمية' }, '-', { k: 'del', icon: 'trash', label: 'حذف الوسم', danger: true }]);
+  if (k === 'rename') { const n = prompt('الاسم الجديد للوسم', t.name); if (n && n.trim()) Store.write(`tags/${tid}/name`, n.trim().slice(0, 40)); scheduleRender(); }
+  if (k === 'del' && confirm(`حذف الوسم «${t.name}» من كل المقالات؟`)) {
+    const upd = { ['tags/' + tid]: null }; const ids = [];
+    for (const [id, m] of Object.entries(S.itags || {})) if (m && m[tid]) { upd[`itags/${id}/${tid}`] = null; ids.push(id); }
+    Store.update(upd); ids.forEach(syncSaved);
+    if (VIEW.type === 'tag' && VIEW.id === tid) setView({ type: 'all' }); else renderAll();
+  }
+}
+
+/* ---------- الملاحظات ---------- */
+function noteModal() {
+  const it = SEL && getItem(SEL); if (!it) return; const n = (S.notes || {})[it.id];
+  const by = USER ? (USER.displayName || USER.email || '') : 'ملاحظتي';
+  modal('ملاحظة على المقالة', `<div class="note-by">${ico('note')}<b>${esc(by)}</b></div>
+    <div class="fld" style="margin:0"><textarea class="in" id="nt-text" rows="6" placeholder="اكتب ملاحظتك هنا…">${esc(n ? n.text : '')}</textarea></div>`,
+    `<button class="btn pri" data-act="note-save">حفظ</button><button class="btn" data-act="close-modal">إلغاء</button>${n ? '<span class="sp" style="flex:1"></span><button class="btn danger" data-act="note-del">حذف الملاحظة</button>' : ''}`);
+}
+function saveNote(del) {
+  const it = SEL && getItem(SEL); if (!it) return closeModal();
+  const text = del ? '' : ($('#nt-text').value || '').trim().slice(0, 5000);
+  const by = USER ? (USER.displayName || USER.email || '') : '';
+  Store.write('notes/' + it.id, text ? { text, at: Date.now(), by } : null); syncSaved(it.id);
+  closeModal(); renderReader(true); toast(text ? 'حُفظت الملاحظة' : 'حُذفت الملاحظة');
+}
+
+/* ---------- بيانات المقالة ---------- */
+function detectLang(s) {
+  const ar = (s.match(/[؀-ۿ]/g) || []).length, lat = (s.match(/[A-Za-z]/g) || []).length;
+  if (ar > lat) return 'العربية';
+  if (/[ğşıİĞŞ]/.test(s)) return 'التركية';
+  return lat ? 'الإنجليزية (تقديراً)' : '—';
+}
+function metaModal() {
+  const it = SEL && getItem(SEL); if (!it) return;
+  const f = S.feeds[it.feedId] || {}; const w = wordCount(it); const tg = itemTagIds(it.id).map(t => S.tags[t].name);
+  const row = (k, v) => `<div class="mt-r"><div class="mt-k">${k}</div><div class="mt-v">${v || '<span style="color:var(--tx3)">—</span>'}</div></div>`;
+  const lnk = x => x ? `<a href="${esc(x)}" target="_blank" rel="noopener" class="ltr" style="display:block;word-break:break-all">${esc(x)}</a>` : '';
+  modal('بيانات المقالة', `<div class="mt">
+    ${row('العنوان', esc(it.title))}
+    ${row('المحرر', esc(it.author))}
+    ${row('الوسوم', esc(tg.join('، ')))}
+    ${row('المصدر', `${esc(f.title || it.feedTitle || '')}${lnk(f.siteUrl)}${lnk(it.link)}`)}
+    ${row('مدة القراءة', readMinutes(it) + ' دقيقة')}
+    ${row('نسبة ما قُرئ', Math.round((PROG.get(it.id) || 0) * 100) + '%')}
+    ${row('عدد الكلمات', w.toLocaleString('ar'))}
+    ${row('تصنيفات RSS', esc((it.cats || []).join('، ')))}
+    ${row('اللغة', detectLang((it.title || '') + ' ' + (it.text || '')))}
+    ${row('تاريخ النشر', esc(fullDate(it.date)))}
+    ${it.firstSeen ? row('وصلت إلى القارئ', esc(fullDate(it.firstSeen))) : ''}
+    ${row('النص', FULLTEXT.has(it.id) ? 'النص الكامل من الموقع' : 'نص الخلاصة (RSS)')}
+  </div>`, '', 'lg');
+}
+
+/* ---------- شكل المقالة والنص ---------- */
+const READ_FONTS = { '': 'خط التطبيق', 'Noto Naskh Arabic': 'نسخ (Noto Naskh)', 'Amiri': 'أميري', 'Cairo': 'القاهرة (Cairo)', 'Tajawal': 'تجوّل (Tajawal)', 'IBM Plex Sans Arabic': 'IBM Plex Arabic', 'Readex Pro': 'Readex Pro' };
+const READ_SIZES = { 15.5: 'صغير', 17.5: 'عادي', 19.5: 'كبير', 22: 'كبير جداً' };
+const READ_LH = { 1.6: '1.6', 1.8: '1.8', 1.95: '1.95 (افتراضي)', 2.2: '2.2' };
+function loadFont(fam) {
+  if (!fam || document.getElementById('gf-' + fam.replace(/\s/g, ''))) return;
+  const l = document.createElement('link'); l.rel = 'stylesheet'; l.id = 'gf-' + fam.replace(/\s/g, '');
+  l.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fam).replace(/%20/g, '+')}:wght@400;700&display=swap`; document.head.appendChild(l);
+}
+function readPrefsStyle() {
+  const fam = setting('rFont') || '', sz = setting('rSize'), lh = setting('rLh');
+  if (fam) loadFont(fam);
+  return `${fam ? `--rf:'${fam}',serif;` : ''}${sz ? `--rs:${sz}px;` : ''}${lh ? `--rl:${lh};` : ''}`;
+}
+function layoutModal() {
+  const sel = (id, map, v) => `<select class="in" id="${id}">${Object.entries(map).map(([k, l]) => `<option value="${esc(k)}"${String(v ?? '') === String(k) ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+  const ov = modal('شكل المقالة والنص', `
+    <div class="fld"><label>الخط</label>${sel('ly-font', READ_FONTS, setting('rFont') || '')}</div>
+    <div class="row"><div class="fld"><label>حجم الخط</label>${sel('ly-size', READ_SIZES, setting('rSize') || 17.5)}</div>
+    <div class="fld"><label>تباعد الأسطر</label>${sel('ly-lh', READ_LH, setting('rLh') || 1.95)}</div></div>
+    <div class="hint" style="font-size:12px;color:var(--tx3)">يُطبَّق على كل المقالات، ويُحفظ في حسابك.</div>`,
+    `<button class="btn pri" data-act="close-modal">تم</button><button class="btn" data-act="ly-reset">إعادة الضبط الافتراضي</button>`);
+  const apply = () => { Store.update({ 'settings/rFont': $('#ly-font').value, 'settings/rSize': Number($('#ly-size').value), 'settings/rLh': Number($('#ly-lh').value) }); renderReader(true); };
+  ['#ly-font', '#ly-size', '#ly-lh'].forEach(x => $(x, ov).addEventListener('change', apply));
+}
+
+/* ---------- قائمة «…» للمقالة ---------- */
+async function artMore(anchor) {
+  const it = SEL && getItem(SEL); if (!it) return; const has = (S.notes || {})[it.id];
+  const k = await popMenu(anchor, [
+    { k: 'meta', icon: 'info', label: 'بيانات المقالة' },
+    { k: 'rule', icon: 'filter', label: 'إنشاء قاعدة لهذا المصدر' },
+    { k: 'note', icon: 'note', label: has ? 'تعديل الملاحظة' : 'إضافة ملاحظة' },
+    { k: 'layout', icon: 'type', label: 'شكل المقالة والنص' },
+    '-',
+    { k: 'read', icon: st(it.id).r ? 'unread' : 'check', label: st(it.id).r ? 'تعليم كغير مقروء' : 'تعليم كمقروء' },
+  ]);
+  if (k === 'meta') metaModal();
+  if (k === 'rule') editRule(null, { scope: 'feed:' + it.feedId, name: (S.feeds[it.feedId] || {}).title || '' });
+  if (k === 'note') noteModal();
+  if (k === 'layout') layoutModal();
+  if (k === 'read') toggleFlag(it.id, 'r');
+}
+async function shareMore(anchor) {
+  const it = SEL && getItem(SEL); if (!it) return;
+  const u = encodeURIComponent(it.link || ''), t = encodeURIComponent(it.title || '');
+  const items = [];
+  if (navigator.share) items.push({ k: 'native', icon: 'share', label: 'مشاركة عبر الجهاز…' });
+  items.push({ k: 'copy', icon: 'copy', label: 'نسخ رابط المقالة' }, { k: 'copyt', icon: 'copy', label: 'نسخ العنوان والرابط' }, '-',
+    { k: 'wa', icon: 'wa', label: 'واتساب' }, { k: 'tg', icon: 'tg', label: 'تلغرام' }, { k: 'x', icon: 'xl', label: 'X' }, { k: 'fb', icon: 'fb', label: 'فيسبوك' }, { k: 'mail', icon: 'mail', label: 'البريد الإلكتروني' }, '-',
+    { k: 'insta', icon: 'ext', label: 'حفظ في Instapaper' }, { k: 'rain', icon: 'ext', label: 'حفظ في Raindrop.io' }, '-',
+    { k: 'pdf', icon: 'doc', label: 'حفظ PDF' }, { k: 'print', icon: 'print', label: 'طباعة المقالة' });
+  const k = await popMenu(anchor, items);
+  const open = x => window.open(x, '_blank', 'noopener');
+  if (k === 'native') navigator.share({ title: it.title, url: it.link }).catch(() => {});
+  if (k === 'copy') navigator.clipboard.writeText(it.link).then(() => toast('نُسخ الرابط'));
+  if (k === 'copyt') navigator.clipboard.writeText(it.title + '\n' + it.link).then(() => toast('نُسخ العنوان والرابط'));
+  if (k === 'wa') open(`https://wa.me/?text=${t}%20${u}`);
+  if (k === 'tg') open(`https://t.me/share/url?url=${u}&text=${t}`);
+  if (k === 'x') open(`https://x.com/intent/post?text=${t}&url=${u}`);
+  if (k === 'fb') open(`https://www.facebook.com/sharer/sharer.php?u=${u}`);
+  if (k === 'mail') location.href = `mailto:?subject=${t}&body=${t}%0A%0A${u}`;
+  if (k === 'insta') open(`https://www.instapaper.com/hello2?url=${u}&title=${t}`);
+  if (k === 'rain') open(`https://app.raindrop.io/add?link=${u}&title=${t}`);
+  if (k === 'print' || k === 'pdf') printArticle(k === 'pdf');
+}
+function printArticle(pdf) {
+  const it = SEL && getItem(SEL); if (!it) return;
+  const f = S.feeds[it.feedId] || { title: it.feedTitle || '' }; const full = FULLTEXT.get(it.id);
+  const body = (full && full.html) || it.html || ''; const lead = /<img\s/i.test(body) ? '' : ((full && full.image) || it.image || '');
+  const fam = setting('rFont') || '';
+  const w = window.open('', '_blank'); if (!w) return toast('اسمح للنوافذ المنبثقة لهذا الموقع ثم أعد المحاولة');
+  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(it.title)}</title>
+    ${fam ? `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(fam).replace(/%20/g, '+')}:wght@400;700&display=swap">` : ''}
+    <style>body{font-family:${fam ? `'${fam}',` : ''}"Segoe UI",Tahoma,sans-serif;max-width:760px;margin:30px auto;padding:0 20px;color:#111;line-height:1.9;font-size:16.5px}
+    h1{font-size:25px;line-height:1.45;margin:6px 0}.m{color:#666;font-size:13px;margin-bottom:16px}img,video{max-width:100%;height:auto}
+    .s{border-top:1px solid #ccc;margin-top:28px;padding-top:10px;font-size:12px;color:#666;word-break:break-all}${pdf ? '.tip{background:#fff6d6;border:1px solid #e8d48a;padding:8px 12px;border-radius:8px;font-size:13px}@media print{.tip{display:none}}' : ''}</style></head><body>
+    ${pdf ? '<p class="tip">لحفظ المقالة PDF: اختر «حفظ بتنسيق PDF» (Save as PDF) في خانة الطابعة.</p>' : ''}
+    <div class="m">${esc(f.title || '')} · ${esc(fullDate(it.date))}${it.author ? ' · ' + esc(it.author) : ''}</div>
+    <h1>${esc(it.title)}</h1>${lead ? `<img src="${esc(lead)}" referrerpolicy="no-referrer">` : ''}<div>${body}</div>
+    <div class="s">المصدر: ${esc(it.link)}<br>طُبعت من S24NReader</div>
+    <script>window.onload=()=>setTimeout(()=>print(),400)<\/script></body></html>`);
+  w.document.close();
+}
+
+/* ---------- التلخيص الذكي ---------- */
+function sumHtml(t) {
+  const lines = String(t).split(/\n+/).map(x => x.trim()).filter(Boolean);
+  const pts = lines.filter(x => /^[-•*]\s*/.test(x)).map(x => x.replace(/^[-•*]\s*/, ''));
+  if (pts.length >= 2) return `<ul>${pts.map(x => `<li>${esc(x.replace(/\*\*/g, ''))}</li>`).join('')}</ul>`;
+  return lines.map(x => `<p>${esc(x.replace(/\*\*/g, ''))}</p>`).join('');
+}
+async function summarize() {
+  const it = SEL && getItem(SEL); if (!it) return;
+  const cur = SUMS.get(it.id);
+  if (cur && cur.text) { cur.hidden = !cur.hidden; return renderReader(true); }
+  if (cur && cur.loading) return;
+  const ai = (CONFIG.AI_URL || '').replace(/\/+$/, '');
+  if (!ai) return toast('التلخيص الذكي غير مفعّل بعد');
+  const full = FULLTEXT.get(it.id); const text = plain((full && full.html) || it.html || '') || it.text || '';
+  if (text.length < 200) {
+    if (!full && it.link) { toast('النص قصير، أجلب المقالة كاملة أولاً…', 1800); await loadFullText(it.id); if (FULLTEXT.has(it.id)) return summarize(); }
+    return toast('النص أقصر من أن يُلخَّص');
+  }
+  SUMS.set(it.id, { loading: true }); renderReader(true);
+  try {
+    const r = await fetch(ai + '/summarize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: it.title, text: text.slice(0, 12000), url: it.link }) });
+    let j = {}; try { j = await r.json(); } catch {}
+    if (!r.ok || !j.summary) {
+      const map = { quota: 'انتهت حصة التلخيص لهذا اليوم، حاول لاحقاً', not_configured: 'خادم التلخيص لم يُضبط بعد (مفتاح Gemini)', origin: 'خادم التلخيص لا يقبل هذا النطاق', too_short: 'النص أقصر من أن يُلخَّص' };
+      throw new Error(map[j.error] || (/^model_/.test(j.message || '') ? 'مفتاح Gemini أو اسم النموذج غير صالح' : j.message) || ('خطأ ' + r.status));
+    }
+    SUMS.set(it.id, { text: j.summary }); saveSums();
+  } catch (e) {
+    SUMS.delete(it.id);
+    toast('تعذّر التلخيص: ' + (e.message === 'Failed to fetch' ? 'خادم التلخيص غير متاح بعد' : e.message), 4000);
+  }
+  if (SEL === it.id) renderReader(true);
+}
+
+/* ---------- تقدّم القراءة ---------- */
+$('#reader').addEventListener('scroll', () => {
+  const r = $('#reader'); if (!SEL || VIEW.type === 'drafts') return;
+  const max = r.scrollHeight - r.clientHeight; const p = max > 20 ? Math.min(1, r.scrollTop / max) : 1;
+  if (p <= (PROG.get(SEL) || 0)) return; PROG.set(SEL, p);
+  const g = $('.r-prog', r); if (!g) return;
+  $('.v', g).style.strokeDashoffset = 94.25 * (1 - p);
+  g.classList.toggle('done', p >= .98); $('b', g).textContent = p >= .98 ? '✓' : Math.round(p * 100);
+}, { passive: true });
+// النقر على الخلفية المعتمة يغلق النافذة المنبثقة
+$('#reader').addEventListener('mousedown', e => { if (e.target.id === 'reader' && $('#main').classList.contains('cards-mode')) closeReader(); });
+function closeReader() { SEL = null; $('#main').classList.remove('reading'); renderList(); renderReader(); }
 
 /* ---------- المسودات (إرسال الخبر إلى الكتابة) ---------- */
 function draftsSorted() { return Object.entries(S.drafts || {}).sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0)); }
@@ -1093,7 +1457,7 @@ function scheduleRender(key) {
 function readerSig() {
   if (VIEW.type === 'drafts') { const d = S.drafts[SEL]; return 'd|' + SEL + '|' + (d ? d.updatedAt : 'x'); }
   const it = SEL && getItem(SEL);
-  return 'i|' + SEL + '|' + (it ? it.title + (it.html || '').length : 'x') + '|' + JSON.stringify(st(SEL || '')) + '|' + FULLTEXT.has(SEL);
+  return 'i|' + SEL + '|' + (it ? it.title + (it.html || '').length : 'x') + '|' + JSON.stringify(st(SEL || '')) + '|' + FULLTEXT.has(SEL) + '|' + JSON.stringify((S.itags || {})[SEL] || 0) + JSON.stringify((S.notes || {})[SEL] || 0) + itemTagIds(SEL || '').map(k => S.tags[k].name).join() + [setting('rFont'), setting('rSize'), setting('rLh')].join();
 }
 let _lastSig = '', _lastSel = null;
 function renderAll() { applyTheme(); renderSide(); renderList(); renderReader(true); }
@@ -1613,7 +1977,19 @@ document.addEventListener('click', async e => {
       case 'to-draft': if (it) itemToDraft(it); break;
       case 'copy-link': if (it) { navigator.clipboard.writeText(it.link).then(() => toast('نُسخ الرابط')); } break;
       case 'fulltext': if (it) loadFullText(it.id); break;
-      case 'close-reader': SEL = null; $('#main').classList.remove('reading'); renderList(); renderReader(); break;
+      case 'close-reader': closeReader(); break;
+      case 'prev-item': moveSel(-1); break;
+      case 'next-item': moveSel(1); break;
+      case 'tags-pop': tagsPop(t); break;
+      case 'untag': if (it) setTag(it.id, id, false); break;
+      case 'tag-menu': tagMenu(t, id); break;
+      case 'art-more': artMore(t); break;
+      case 'share-more': shareMore(t); break;
+      case 'note': noteModal(); break;
+      case 'note-save': saveNote(false); break;
+      case 'note-del': saveNote(true); break;
+      case 'ly-reset': Store.update({ 'settings/rFont': '', 'settings/rSize': null, 'settings/rLh': null }); closeModal(); renderReader(true); toast('أُعيد شكل النص الافتراضي'); break;
+      case 'summarize': summarize(); break;
       case 'new-draft': { const did = uid(); Store.write('drafts/' + did, { title: '', body: '', createdAt: Date.now(), updatedAt: Date.now() }); setView({ type: 'drafts' }, did); setTimeout(() => $('#d-title') && $('#d-title').focus(), 50); break; }
       case 'draft-copy': { const d = S.drafts[SEL]; if (d) navigator.clipboard.writeText(d.title + '\n\n' + d.body).then(() => toast('نُسخ النص')); break; }
       case 'draft-copy-html': { const d = S.drafts[SEL]; if (d) navigator.clipboard.writeText(draftHtml(d)).then(() => toast('نُسخ HTML')); break; }
@@ -1660,10 +2036,11 @@ document.addEventListener('keydown', e => {
     case 'm': if (it) toggleFlag(it.id, 'r'); break;
     case 'v': if (it) window.open(it.link, '_blank', 'noopener'); break;
     case 'd': if (it) itemToDraft(it); break;
+    case 't': if (it) { const b = $('[data-act="tags-pop"]'); if (b) { e.preventDefault(); tagsPop(b); } } break;
     case 'r': refreshAll(); break;
     case 'z': if (UNDO) UNDO(); break;
     case '/': e.preventDefault(); $('#q').focus(); break;
-    case 'Escape': if (SEL) { SEL = null; $('#main').classList.remove('reading'); renderList(); renderReader(); } break;
+    case 'Escape': if (document.querySelector('.tagpop,.menu')) { document.querySelectorAll('.tagpop,.menu').forEach(m => m.remove()); break; } if (SEL) closeReader(); break;
   }
 });
 
@@ -1714,7 +2091,7 @@ async function boot() {
   }
 }
 // للاختبار من وحدة التحكم
-window.S24R = { renderAuth, parseDoc, scrapeLinks, sanitize, extractArticle, matchRules, normAr, get S() { return S; }, ITEMS };
+window.S24R = { renderAuth, parseDoc, scrapeLinks, sanitize, extractArticle, matchRules, normAr, get S() { return S; }, ITEMS, get SEL() { return SEL; }, renderAll, setView, currentItems, viewTitle, itemTagIds, Store };
 boot();
 })();
 </script>
