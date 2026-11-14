@@ -947,6 +947,7 @@ function getItem(id) { return ITEMS.get(id) || (S.saved && S.saved[id]) || null;
 function setFlag(id, flag, on) {
   const it = getItem(id); if (!it) return;
   const s = { ...st(id) }; if (on) s[flag] = 1; else delete s[flag]; s.t = Date.now();
+  if (flag === 'l' && !on) { delete s.p; PROG.delete(id); }
   const upd = { ['states/' + id]: Object.keys(s).length > 1 ? s : null };
   if (flag === 's' || flag === 'l') upd['saved/' + id] = (s.s || s.l || hasExtras(id)) ? snapshot(it) : null;
   Store.update(upd); scheduleRender();
@@ -1129,10 +1130,13 @@ function emptyState() {
 function renderReader(force) {
   const r = $('#reader'); const sig = readerSig();
   if (!force && sig === _lastSig) return;
-  const keepScroll = _lastSel === SEL ? r.scrollTop : 0;
+  const opened = _lastSel !== SEL; const keepScroll = opened ? 0 : r.scrollTop;
   _lastSig = sig; _lastSel = SEL;
   _renderReader(r);
   r.scrollTop = keepScroll;
+  // مقالة «لاحقاً» قُرئ جزء منها: نعود إلى حيث توقف القارئ
+  const pr = SEL ? progOf(SEL) : 0, id = SEL;
+  if (opened && id && st(id).l && pr > .03 && pr < .97) setTimeout(() => { if (SEL === id) r.scrollTop = pr * (r.scrollHeight - r.clientHeight); }, 400);
 }
 function _renderReader(r) {
   if (VIEW.type === 'drafts') return renderDraftEditor(r);
@@ -1149,7 +1153,7 @@ function _renderReader(r) {
   const lead = /<img\s/i.test(body || '') ? '' : ((full && full.image) || it.image || '');
   const tg = itemTagIds(it.id), note = (S.notes || {})[it.id], sum = SUMS.get(it.id);
   const u = encodeURIComponent(it.link || ''), t = encodeURIComponent(it.title || '');
-  const pr = PROG.get(it.id) || 0;
+  const pr = progOf(it.id);
   r.innerHTML = `<button class="r-x" data-act="close-reader" title="إغلاق (Esc)">${ico('x')}</button>
     <button class="r-nav prev" data-act="prev-item" title="السابقة (k)">${ico('back')}</button>
     <button class="r-nav next" data-act="next-item" title="التالية (j)">${ico('chl')}</button>
@@ -1170,7 +1174,7 @@ function _renderReader(r) {
         <a class="ibtn" href="https://www.facebook.com/sharer/sharer.php?u=${u}" target="_blank" rel="noopener" title="فيسبوك">${ico('fb')}</a>
       </span>
       <button class="ibtn" data-act="share-more" title="مشاركة وحفظ">${ico('share')}</button>
-      <span class="r-prog${pr >= .98 ? ' done' : ''}" title="تقدّم القراءة"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/><circle class="v" cx="18" cy="18" r="15" style="stroke-dashoffset:${94.25 * (1 - pr)}"/></svg><b>${pr >= .98 ? '✓' : Math.round(pr * 100)}</b></span>
+            ${s.l ? `<span class="r-prog${pr >= .98 ? ' done' : ''}" title="تقدّم القراءة"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/><circle class="v" cx="18" cy="18" r="15" style="stroke-dashoffset:${94.25 * (1 - pr)}"/></svg><b>${pr >= .98 ? '✓' : Math.round(pr * 100)}</b></span>` : ''}
       <button class="btn sm" data-act="fulltext" title="النص الكامل">${ico('doc')}<span class="t">${full ? 'النص الكامل ✓' : 'النص الكامل'}</span></button>
       <a class="btn sm" href="${esc(it.link)}" target="_blank" rel="noopener noreferrer">${ico('ext')}<span class="hide-m">الموقع الأصلي</span></a>
     </div>
@@ -1192,6 +1196,13 @@ function _renderReader(r) {
    وحدة المقالة: الوسوم، الملاحظات، البيانات، شكل النص، المشاركة، التلخيص
    ========================================================= */
 const PROG = new Map();   // تقدّم القراءة لكل مقالة (0..1)
+// التقدّم يُحفظ في الحساب (states/<id>/p) لمقالات «لاحقاً» فقط، فيبقى بعد التحديث وعلى كل الأجهزة
+const progOf = id => Math.max(PROG.get(id) || 0, st(id).p || 0);
+const _progT = {};
+function saveProg(id) {
+  clearTimeout(_progT[id]);
+  _progT[id] = setTimeout(() => { const p = Math.round(progOf(id) * 100) / 100; if (st(id).l && p > (st(id).p || 0)) Store.write(`states/${id}/p`, p); }, 2500);
+}
 const SUMS = new Map(lsGet('s24r_sums', []));   // الملخصات المحفوظة في هذا المتصفح
 const saveSums = () => lsSet('s24r_sums', [...SUMS].filter(([, v]) => v.text).slice(-150).map(([k, v]) => [k, { text: v.text }]));
 const hasExtras = id => itemTagIds(id).length > 0 || !!(S.notes || {})[id];
@@ -1299,7 +1310,7 @@ function metaModal() {
     ${row('الوسوم', esc(tg.join('، ')))}
     ${row('المصدر', `${esc(f.title || it.feedTitle || '')}${lnk(f.siteUrl)}${lnk(it.link)}`)}
     ${row('مدة القراءة', readMinutes(it) + ' دقيقة')}
-    ${row('نسبة ما قُرئ', Math.round((PROG.get(it.id) || 0) * 100) + '%')}
+    ${row('نسبة ما قُرئ', Math.round(progOf(it.id) * 100) + '%')}
     ${row('عدد الكلمات', w.toLocaleString('ar'))}
     ${row('تصنيفات RSS', esc((it.cats || []).join('، ')))}
     ${row('اللغة', detectLang((it.title || '') + ' ' + (it.text || '')))}
@@ -1431,9 +1442,9 @@ async function summarize() {
 
 /* ---------- تقدّم القراءة ---------- */
 $('#reader').addEventListener('scroll', () => {
-  const r = $('#reader'); if (!SEL || VIEW.type === 'drafts') return;
-  const max = r.scrollHeight - r.clientHeight; const p = max > 20 ? Math.min(1, r.scrollTop / max) : 1;
-  if (p <= (PROG.get(SEL) || 0)) return; PROG.set(SEL, p);
+    const r = $('#reader'); if (!SEL || VIEW.type === 'drafts' || !st(SEL).l) return;
+  const max = r.scrollHeight - r.clientHeight; if (max <= 20) return; const p = Math.min(1, r.scrollTop / max);
+  if (p <= progOf(SEL)) return; PROG.set(SEL, p); saveProg(SEL);
   const g = $('.r-prog', r); if (!g) return;
   $('.v', g).style.strokeDashoffset = 94.25 * (1 - p);
   g.classList.toggle('done', p >= .98); $('b', g).textContent = p >= .98 ? '✓' : Math.round(p * 100);
@@ -1504,7 +1515,7 @@ function scheduleRender(key) {
 function readerSig() {
   if (VIEW.type === 'drafts') { const d = S.drafts[SEL]; return 'd|' + SEL + '|' + (d ? d.updatedAt : 'x'); }
   const it = SEL && getItem(SEL);
-  return 'i|' + SEL + '|' + (it ? it.title + (it.html || '').length : 'x') + '|' + JSON.stringify(st(SEL || '')) + '|' + FULLTEXT.has(SEL) + '|' + JSON.stringify((S.itags || {})[SEL] || 0) + JSON.stringify((S.notes || {})[SEL] || 0) + itemTagIds(SEL || '').map(k => S.tags[k].name).join() + [setting('rFont'), setting('rSize'), setting('rLh')].join();
+  return 'i|' + SEL + '|' + (it ? it.title + (it.html || '').length : 'x') + '|' + JSON.stringify({ ...st(SEL || ''), p: 0 }) + '|' + FULLTEXT.has(SEL) + '|' + JSON.stringify((S.itags || {})[SEL] || 0) + JSON.stringify((S.notes || {})[SEL] || 0) + itemTagIds(SEL || '').map(k => S.tags[k].name).join() + [setting('rFont'), setting('rSize'), setting('rLh')].join();
 }
 let _lastSig = '', _lastSel = null;
 function renderAll() { applyTheme(); renderSide(); renderList(); renderReader(true); }
