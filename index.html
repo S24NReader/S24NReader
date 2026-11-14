@@ -63,8 +63,25 @@ a{color:var(--ac)}
 .spin{animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(-360deg)}}
 
-.main{display:grid;grid-template-columns:260px minmax(320px,440px) 1fr;min-height:0}
-.main.wide-list{grid-template-columns:260px 1fr 0}
+.main{--w-side:260px;--w-list:400px;display:grid;grid-template-columns:var(--w-side) var(--w-list) minmax(0,1fr);min-height:0;position:relative}
+.main.wide-list{grid-template-columns:var(--w-side) 1fr 0}
+/* مقابض تغيير عرض الأعمدة */
+.col-rs{position:absolute;top:0;bottom:0;width:9px;margin-right:-5px;z-index:6;cursor:col-resize;touch-action:none}
+.col-rs::after{content:'';position:absolute;top:0;bottom:0;right:3px;width:3px;background:var(--ac);opacity:0;transition:opacity .12s}
+.col-rs:hover::after,.col-rs.on::after{opacity:1}
+#rs-side{right:var(--w-side)}
+#rs-list{right:calc(var(--w-side) + var(--w-list))}
+.main.wide-list #rs-list,.main.cards-mode #rs-list{display:none}
+body.col-resizing{cursor:col-resize;user-select:none}
+body.col-resizing iframe,body.col-resizing .reader{pointer-events:none}
+/* سحب المصادر */
+.nav-i.drag-ghost{position:fixed;margin:0;z-index:1000;pointer-events:none;opacity:.85;background:var(--panel);border-radius:8px;box-shadow:var(--shadow);direction:rtl}
+.drop-line{position:fixed;z-index:999;height:2px;background:var(--ac);pointer-events:none;border-radius:2px}
+.drop-line::before{content:'';position:absolute;right:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--ac)}
+.nav-i.drop-in{outline:2px solid var(--ac);outline-offset:-2px;background:var(--ac2)}
+.nav-i.dragging-src{opacity:.35}
+body.feed-dragging{cursor:grabbing;user-select:none}
+body.feed-dragging .nav-i:hover{background:none}
 /* ---------- الشريط الجانبي ---------- */
 .side{background:var(--side);border-left:1px solid var(--line);overflow:auto;padding:10px 8px 40px}
 .nav-i{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:8px;color:var(--tx2);cursor:pointer;user-select:none;position:relative}
@@ -231,16 +248,16 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
 
 /* ---------- الجوال ---------- */
 /* وضع البطاقات: الشبكة تأخذ العرض كله، والمقالة تُفتح مكانها مع زر رجوع */
-.main.cards-mode{grid-template-columns:260px 1fr}
+.main.cards-mode{grid-template-columns:var(--w-side) 1fr}
 .main.cards-mode .reader{display:none}
 .main.cards-mode.reading .list{display:none}
 .main.cards-mode.reading .reader{display:block}
 .main.cards-mode .r-back{display:grid}
 .seg .ico{width:15px;height:15px;display:block}
-@media (max-width:1100px){ .main{grid-template-columns:240px 1fr} .main .reader{display:none} .main.reading .list{display:none} .main.reading .reader{display:block} .r-back{display:grid} }
+@media (max-width:1100px){ .main{grid-template-columns:var(--w-side) 1fr} #rs-list{display:none} .main .reader{display:none} .main.reading .list{display:none} .main.reading .reader{display:block} .r-back{display:grid} }
 @media (max-width:760px){
   .brand{min-width:0} .brand span{display:none}
-  .main{grid-template-columns:1fr}
+  .main{grid-template-columns:1fr} .col-rs{display:none}
   .side{position:fixed;top:56px;bottom:0;right:0;width:82%;max-width:300px;z-index:30;transform:translateX(105%);transition:transform .2s;box-shadow:var(--shadow)}
   .side.open{transform:none}
   .art{padding:18px 16px 70px} .art h1{font-size:22px} .art-body{font-size:16.5px}
@@ -275,6 +292,8 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
         <div class="items" id="items"></div>
       </section>
       <section class="reader" id="reader"></section>
+      <div class="col-rs" id="rs-side" title="اسحب لتغيير العرض — نقرتان للعرض الافتراضي"></div>
+      <div class="col-rs" id="rs-list" title="اسحب لتغيير العرض — نقرتان للعرض الافتراضي"></div>
     </div>
   </div>
 </div>
@@ -417,6 +436,7 @@ let QUERY = '';
 let USER = null;
 let REFRESHING = false;
 const collapsed = new Set(lsGet('s24r_collapsed', []));
+let DRAG = null;                  // حالة سحب مصدر في الشريط الجانبي
 const setting = k => (S.settings && S.settings[k] != null) ? S.settings[k] : DEFAULT_SETTINGS[k];
 
 /* ---------- التخزين: محلي أو Firebase ---------- */
@@ -825,7 +845,7 @@ function pruneStates() { // حذف حالات المقالات القديمة ا
 /* =========================================================
    العرض
    ========================================================= */
-function feedsInFolder(fid) { return Object.entries(S.feeds).filter(([, f]) => (f.folder || '') === fid).sort((a, b) => (a[1].title || '').localeCompare(b[1].title || '', 'ar')); }
+function feedsInFolder(fid) { const O = f => f.order == null ? 1e15 : f.order; return Object.entries(S.feeds).filter(([, f]) => (f.folder || '') === fid).sort((a, b) => O(a[1]) - O(b[1]) || (a[1].title || '').localeCompare(b[1].title || '', 'ar')); }
 // عدّاد غير المقروء: مرور واحد على كل المقالات لكل رسم
 function unreadCounts() {
   const feed = {}, folder = {}, rule = {}; let total = 0;
@@ -871,7 +891,8 @@ function viewTitle() {
   return '';
 }
 
-function renderSide() {
+function renderSide(force) {
+  if (DRAG && DRAG.on && !force) { DRAG.pending = true; return; }
   const act = (t, id) => VIEW.type === t && (id == null || VIEW.id === id) ? ' act' : '';
   const UC = unreadCounts(); const total = UC.total;
   const countSaved = f => Object.values(S.saved || {}).filter(it => st(it.id)[f]).length;
@@ -880,12 +901,12 @@ function renderSide() {
 
   const feedRow = ([id, f]) => {
     const n = UC.feed[id] || 0; const err = FEED_STATUS[id] && FEED_STATUS[id].error;
-    return `<div class="nav-i${act('feed', id)}${n ? ' has-unread' : ''}" data-view="feed" data-id="${esc(id)}" title="${esc(err || f.url)}">
-      <img class="fav" src="${esc(favicon(f.siteUrl || f.url))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
+    return `<div class="nav-i${act('feed', id)}${n ? ' has-unread' : ''}" data-view="feed" data-id="${esc(id)}" data-drag="feed" title="${esc(err || f.url)}">
+      <img class="fav" src="${esc(favicon(f.siteUrl || f.url))}" alt="" draggable="false" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
       <span class="lbl">${esc(f.title || hostOf(f.url))}</span>${err ? '<span class="err"></span>' : ''}<span class="cnt">${n || ''}</span>
       <button class="more" data-act="feed-menu" data-id="${esc(id)}" title="خيارات">${ico('more')}</button></div>`;
   };
-  h += `<h4>المصادر <span><button data-act="new-folder" title="مجلد جديد">${ico('folder')}</button> <button data-act="add-feed" title="إضافة مصدر">${ico('plus')}</button></span></h4>`;
+  h += `<h4 data-drop="root">المصادر <span><button data-act="new-folder" title="مجلد جديد">${ico('folder')}</button> <button data-act="add-feed" title="إضافة مصدر">${ico('plus')}</button></span></h4>`;
   const folders = Object.entries(S.folders || {}).sort((a, b) => (a[1].order || 0) - (b[1].order || 0) || a[1].name.localeCompare(b[1].name, 'ar'));
   for (const [fid, fo] of folders) {
     const n = UC.folder[fid] || 0;
@@ -1407,6 +1428,150 @@ async function authAction(kind) {
   } catch (e) { renderAuth(kind === 'google' ? 'in' : mode, AUTH_ERR[e.code] || e.message); }
 }
 function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+
+/* =========================================================
+   تغيير عرض الأعمدة بالسحب (يُحفظ لكل جهاز)
+   ========================================================= */
+const COL_LIM = { side: [180, 480], list: [280, 900] };
+const COLW = lsGet('s24r_cols', {});
+function applyCols() {
+  const m = $('#main');
+  ['side', 'list'].forEach(k => COLW[k] ? m.style.setProperty('--w-' + k, COLW[k] + 'px') : m.style.removeProperty('--w-' + k));
+}
+applyCols();
+document.querySelectorAll('.col-rs').forEach(h => {
+  const k = h.id === 'rs-side' ? 'side' : 'list';
+  h.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return; e.preventDefault();
+    const m = $('#main'), x0 = e.clientX;
+    const w0 = parseFloat(getComputedStyle(m).getPropertyValue('--w-' + k)) || (k === 'side' ? 260 : 400);
+    h.setPointerCapture(e.pointerId); h.classList.add('on'); document.body.classList.add('col-resizing');
+    const move = ev => {
+      // الواجهة من اليمين لليسار: السحب نحو اليسار يوسّع العمود
+      let w = w0 + (x0 - ev.clientX);
+      let [mn, mx] = COL_LIM[k];
+      if (k === 'list') mx = Math.min(mx, m.clientWidth - (COLW.side || 260) - 360); // يبقى لعمود القراءة 360px على الأقل
+      else mx = Math.min(mx, m.clientWidth - 300);
+      w = Math.round(Math.max(mn, Math.min(mx, w)));
+      COLW[k] = w; m.style.setProperty('--w-' + k, w + 'px');
+    };
+    const up = () => {
+      h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up);
+      h.classList.remove('on'); document.body.classList.remove('col-resizing'); lsSet('s24r_cols', COLW);
+    };
+    h.addEventListener('pointermove', move); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
+  });
+  h.addEventListener('dblclick', () => { delete COLW[k]; lsSet('s24r_cols', COLW); applyCols(); });
+});
+
+/* =========================================================
+   سحب المصادر وإفلاتها: ترتيب يدوي ونقل بين المجلدات
+   الحاسوب: اضغط واسحب — الجوال: اضغط مطوّلاً ثم اسحب
+   ========================================================= */
+let DRAG_CLICK_BLOCK = false;
+document.addEventListener('click', e => { if (DRAG_CLICK_BLOCK) { DRAG_CLICK_BLOCK = false; e.preventDefault(); e.stopImmediatePropagation(); } }, true);
+document.addEventListener('touchmove', e => { if (DRAG && DRAG.on) e.preventDefault(); }, { passive: false });
+$('#side').addEventListener('contextmenu', e => { if (e.target.closest('[data-drag]')) e.preventDefault(); });
+
+$('#side').addEventListener('pointerdown', e => {
+  const row = e.target.closest('[data-drag="feed"]');
+  if (!row || e.target.closest('.more') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  if (e.pointerType === 'mouse') e.preventDefault();
+  DRAG = { id: row.dataset.id, row, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, on: false, touch: e.pointerType !== 'mouse', pid: e.pointerId };
+  if (DRAG.touch) DRAG.timer = setTimeout(() => DRAG && startFeedDrag(), 380);
+  document.addEventListener('pointermove', onFeedDragMove);
+  document.addEventListener('pointerup', endFeedDrag);
+  document.addEventListener('pointercancel', cancelFeedDrag);
+});
+
+function startFeedDrag() {
+  const d = DRAG; d.on = true;
+  if (navigator.vibrate && d.touch) navigator.vibrate(15);
+  const r = d.row.getBoundingClientRect();
+  d.dx = d.x - r.left; d.dy = d.y - r.top;
+  d.ghost = d.row.cloneNode(true); d.ghost.classList.remove('act', 'drop-in'); d.ghost.classList.add('drag-ghost');
+  d.ghost.style.width = r.width + 'px'; document.body.appendChild(d.ghost);
+  d.line = document.createElement('div'); d.line.className = 'drop-line hidden'; document.body.appendChild(d.line);
+  d.row.classList.add('dragging-src'); document.body.classList.add('feed-dragging');
+  placeGhost(); trackDrop();
+  const loop = () => { if (!DRAG || !DRAG.on) return; autoScrollSide(); DRAG.raf = requestAnimationFrame(loop); }; loop();
+}
+function onFeedDragMove(e) {
+  const d = DRAG; if (!d || e.pointerId !== d.pid) return;
+  d.x = e.clientX; d.y = e.clientY;
+  if (!d.on) {
+    const far = Math.hypot(d.x - d.x0, d.y - d.y0) > (d.touch ? 10 : 5);
+    if (d.touch) { if (far) cancelFeedDrag(); return; }  // حركة قبل انتهاء الضغط المطوّل = تمرير عادي
+    if (!far) return; startFeedDrag();
+  }
+  placeGhost(); trackDrop();
+}
+function placeGhost() { const d = DRAG; d.ghost.style.left = (d.x - d.dx) + 'px'; d.ghost.style.top = (d.y - d.dy) + 'px'; }
+function autoScrollSide() {
+  const sd = $('#side'), r = sd.getBoundingClientRect(), y = DRAG.y, edge = 48;
+  if (y < r.top + edge) sd.scrollTop -= Math.ceil((r.top + edge - y) / 4);
+  else if (y > r.bottom - edge) sd.scrollTop += Math.ceil((y - (r.bottom - edge)) / 4);
+  else return;
+  trackDrop();
+}
+function trackDrop() {
+  const d = DRAG; let tgt = null;
+  $$('#side .drop-in').forEach(n => n.classList.remove('drop-in'));
+  const el = document.elementFromPoint(d.x, d.y);
+  const row = el && el.closest('#side .nav-i[data-view="feed"], #side .nav-i[data-view="folder"], #side h4[data-drop="root"]');
+  if (row && row.matches('[data-view="folder"]')) {
+    const fid = row.dataset.id; row.classList.add('drop-in'); tgt = { folder: fid, before: null, end: true };
+    // مجلد مطوي: يُفتح بعد ثلثي ثانية من الوقوف فوقه
+    if (collapsed.has(fid)) { if (d.hoverFid !== fid) { clearTimeout(d.openT); d.hoverFid = fid; d.openT = setTimeout(() => { if (DRAG && DRAG.on && DRAG.hoverFid === fid) { collapsed.delete(fid); lsSet('s24r_collapsed', [...collapsed]); renderSide(true); trackDrop(); } }, 650); } }
+    else { clearTimeout(d.openT); d.hoverFid = null; }
+  } else {
+    clearTimeout(d.openT); d.hoverFid = null;
+    if (row && row.matches('h4')) { tgt = { folder: '', before: (feedsInFolder('').find(([i]) => i !== d.id) || [])[0] || null }; const fr = row.getBoundingClientRect(); showLine(fr, fr.bottom); }
+    else if (row) {
+      const r = row.getBoundingClientRect(), f = S.feeds[row.dataset.id];
+      if (f) {
+        const after = d.y > r.top + r.height / 2, fid = f.folder || '';
+        const list = feedsInFolder(fid).map(([i]) => i).filter(i => i !== d.id);
+        let idx = list.indexOf(row.dataset.id); if (idx < 0) idx = list.length; else if (after) idx++;
+        tgt = { folder: fid, before: list[idx] || null };
+        showLine(r, after ? r.bottom : r.top);
+      }
+    }
+  }
+  if (!tgt || tgt.end) d.line.classList.add('hidden');
+  d.tgt = tgt;
+}
+function showLine(r, y) { const l = DRAG.line; l.classList.remove('hidden'); l.style.left = r.left + 'px'; l.style.width = r.width + 'px'; l.style.top = (y - 1) + 'px'; }
+function cleanupFeedDrag() {
+  const d = DRAG; if (!d) return;
+  clearTimeout(d.timer); clearTimeout(d.openT); cancelAnimationFrame(d.raf);
+  document.removeEventListener('pointermove', onFeedDragMove);
+  document.removeEventListener('pointerup', endFeedDrag);
+  document.removeEventListener('pointercancel', cancelFeedDrag);
+  if (d.ghost) d.ghost.remove(); if (d.line) d.line.remove();
+  document.body.classList.remove('feed-dragging');
+  const redraw = d.on || d.pending; DRAG = null;
+  if (redraw) renderSide();   // لا نعيد الرسم بعد نقرة عادية حتى لا يضيع حدث النقر
+}
+function cancelFeedDrag() { if (DRAG && DRAG.on) { DRAG_CLICK_BLOCK = true; setTimeout(() => DRAG_CLICK_BLOCK = false, 0); } cleanupFeedDrag(); }
+function endFeedDrag(e) {
+  const d = DRAG; if (!d || e.pointerId !== d.pid) return;
+  if (!d.on) { cleanupFeedDrag(); return; }   // لم يحدث سحب: نقرة عادية تفتح المصدر
+  DRAG_CLICK_BLOCK = true; setTimeout(() => DRAG_CLICK_BLOCK = false, 0);
+  const t = d.tgt, id = d.id; cleanupFeedDrag();
+  if (!t || !S.feeds[id]) return;
+  const list = feedsInFolder(t.folder).map(([i]) => i).filter(i => i !== id);
+  const at = t.before ? list.indexOf(t.before) : -1;
+  list.splice(at < 0 ? list.length : at, 0, id);
+  const upd = {};
+  list.forEach((fid, i) => { if (S.feeds[fid].order !== (i + 1) * 10) upd[`feeds/${fid}/order`] = (i + 1) * 10; });
+  const moved = (S.feeds[id].folder || '') !== t.folder;
+  if (moved) upd[`feeds/${id}/folder`] = t.folder;
+  if (!Object.keys(upd).length) return;
+  Store.update(upd);
+  if (moved) toast(t.folder ? `نُقل إلى «${(S.folders[t.folder] || {}).name || 'مجلد'}»` : 'نُقل خارج المجلدات');
+  renderAll();
+}
 
 /* =========================================================
    الأحداث
