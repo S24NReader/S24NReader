@@ -755,6 +755,37 @@ function bigImg(u) {
   return u.replace(/\/s\d+(-c)?(-[a-z0-9-]+)?\//, '/s1200/').replace(/\/w\d+-h\d+(-[a-z0-9-]+)?\//, '/s1200/').replace(/=s\d+(-c)?$/, '=s1200').replace(/=w\d+-h\d+[^/]*$/, '=s1200');
 }
 function firstImg(html, base) { const m = /<img[^>]+src=["']([^"']+)/i.exec(html || ''); return m ? absUrl(m[1], base) : ''; }
+/* ---------- صورة البطاقة من og:image حين تخلو الخلاصة من صورة ---------- */
+const OG_Q = [], OG_BUSY = new Set(), OG_SAVE = {}; let OG_RUN = 0, OG_IO = null;
+function watchThumbs(box) {
+  if (!('IntersectionObserver' in window)) return;
+  if (!OG_IO) OG_IO = new IntersectionObserver(es => es.forEach(e => {
+    if (!e.isIntersecting) return; OG_IO.unobserve(e.target);
+    const id = e.target.dataset.item; if (!OG_BUSY.has(id)) { OG_BUSY.add(id); OG_Q.push(id); ogPump(); }
+  }), { rootMargin: '300px' });
+  OG_IO.disconnect();
+  for (const c of box.querySelectorAll('.it[data-item]')) { const it = ITEMS.get(c.dataset.item); if (it && !it.image && !it.noImg && it.link) OG_IO.observe(c); }
+}
+function ogPump() { while (OG_RUN < 2 && OG_Q.length) { OG_RUN++; ogFetch(OG_Q.shift()).finally(() => { OG_RUN--; ogPump(); }); } }
+async function ogFetch(id) {
+  const it0 = ITEMS.get(id); if (!it0 || it0.image || it0.noImg) return;
+  let img = '';
+  try {
+    const { text, finalUrl } = await fetchText(it0.link);
+    const d = new DOMParser().parseFromString(text, 'text/html');
+    const m = d.querySelector('meta[property="og:image"],meta[name="og:image"],meta[name="twitter:image"],meta[property="twitter:image"],link[rel="image_src"]');
+    img = m ? absUrl(m.getAttribute('content') || m.getAttribute('href') || '', finalUrl) : '';
+  } catch { return; } // خطأ في الشبكة: نعيد المحاولة في جلسة لاحقة
+  const it = ITEMS.get(id) || it0; // قد يكون التحديث استبدل كائن المقالة أثناء الجلب
+  if (img) it.image = bigImg(img); else it.noImg = 1;
+  ogSave(it.feedId);
+  const c = img && document.querySelector(`#items.cards .it[data-item="${CSS.escape(id)}"]`);
+  if (c && !c.querySelector('.it-th')) c.insertAdjacentHTML('afterbegin', `<img class="it-th" src="${esc(it.image)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">`);
+}
+function ogSave(fid) {
+  clearTimeout(OG_SAVE[fid]);
+  OG_SAVE[fid] = setTimeout(() => IDB.put({ feedId: fid, items: [...ITEMS.values()].filter(i => i.feedId === fid), fetchedAt: (FEED_STATUS[fid] || {}).fetchedAt || Date.now() }), 1500);
+}   
 
 /* ---------- استخراج النص الكامل من صفحة المقالة ---------- */
 function extractArticle(doc, url) {
@@ -796,7 +827,7 @@ async function refreshFeed(feedId) {
       const item = {
         id, feedId, title: r.title || '(بلا عنوان)', link: r.link, author: r.author || '',
         date: isNaN(r.date) ? firstSeen : Math.min(r.date, now + 3600e3), firstSeen,
-        html, text: plain(html).slice(0, 400), image: bigImg(r.image || firstImg(html, r.link || finalUrl)), cats: [...new Set(r.cats || [])],
+        html, text: plain(html).slice(0, 400), image: bigImg(r.image || firstImg(html, r.link || finalUrl)) || (prev && prev.image) || '', noImg: prev && prev.noImg, cats: [...new Set(r.cats || [])],
       };
       if (!prev) fresh.push(item);
       prevMap.set(id, item);
@@ -1057,9 +1088,10 @@ function renderList() {
         <div class="it-title">${esc(it.title)}</div>
         ${it.text && setting('view') !== 'cards' ? `<div class="it-snip">${esc(it.text.slice(0, 180))}</div>` : ''}
       </div>
-      ${cards ? '' : th}
+            ${cards ? '' : th}
     </div>`;
   }).join('');
+  if (cards) watchThumbs(box);
 }
 
 function emptyState() {
