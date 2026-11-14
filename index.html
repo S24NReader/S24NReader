@@ -40,7 +40,7 @@ a{color:var(--ac)}
 .hidden{display:none!important}
 
 /* ---------- الهيكل ---------- */
-#app{display:grid;grid-template-rows:56px 1fr;height:100vh;height:100dvh}
+#app{display:grid;grid-template-columns:62px minmax(0,1fr);height:100vh;height:100dvh}
 .top{display:flex;align-items:center;gap:10px;padding:0 14px;background:var(--panel);border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:17px;white-space:nowrap;min-width:200px}
 .brand-mark{width:30px;height:30px;border-radius:8px;background:#0f7b4b;-radius:8px;background:var(--ac);color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700;letter-spacing:-.5px}
@@ -249,10 +249,8 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
 /* ---------- الجوال ---------- */
 /* وضع البطاقات: الشبكة تأخذ العرض كله، والمقالة تُفتح مكانها مع زر رجوع */
 .main.cards-mode{grid-template-columns:var(--w-side) 1fr}
-.main.cards-mode .reader{display:none}
-.main.cards-mode.reading .list{display:none}
-.main.cards-mode.reading .reader{display:block}
-.main.cards-mode .r-back{display:grid}
+/* pop: المقالة تُفتح في نافذة منبثقة (وضع البطاقات ولوحة البداية) */
+.main.pop .reader{display:none}
 .seg .ico{width:15px;height:15px;display:block}
 @media (max-width:1100px){ .main{grid-template-columns:var(--w-side) 1fr} #rs-list{display:none} .main .reader{display:none} .main.reading .list{display:none} .main.reading .reader{display:block} .r-back{display:grid} }
 @media (max-width:760px){
@@ -310,51 +308,176 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
 .mt-v a{color:var(--ac);font-size:13px}
 .note-by{display:flex;align-items:center;gap:8px;margin-bottom:10px}
 /* النافذة المنبثقة في وضع البطاقات */
-.main.cards-mode.reading .list{display:flex}
-.main.cards-mode.reading .reader{display:block;position:fixed;inset:0;z-index:45;background:rgba(10,15,12,.55);overflow:auto;padding:22px 74px;animation:fade .12s}
-.main.cards-mode.reading .r-wrap{max-width:920px;margin:0 auto;background:var(--panel);border-radius:14px;box-shadow:var(--shadow);min-height:100%}
-.main.cards-mode.reading .r-bar{border-radius:14px 14px 0 0;top:-22px}
-.main.cards-mode .r-back{display:none}
-.main.cards-mode.reading .r-x{display:grid;position:fixed;top:18px;left:18px;z-index:46;width:40px;height:40px;place-items:center;border-radius:50%;color:#fff;background:rgba(255,255,255,.12)}
-.main.cards-mode.reading .r-nav{display:grid;position:fixed;top:50%;transform:translateY(-50%);z-index:46;width:48px;height:48px;place-items:center;border-radius:50%;color:#fff;background:rgba(255,255,255,.12)}
-.main.cards-mode.reading .r-nav .ico,.main.cards-mode.reading .r-x .ico{width:24px;height:24px}
-.main.cards-mode.reading .r-nav:hover,.main.cards-mode.reading .r-x:hover{background:rgba(255,255,255,.25)}
-.main.cards-mode.reading .r-nav.prev{right:14px}
-.main.cards-mode.reading .r-nav.next{left:14px}
+.main.pop.reading .list{display:flex}
+.main.pop.reading .reader{display:block;position:fixed;inset:0;z-index:45;background:rgba(10,15,12,.55);overflow:auto;padding:22px 74px;animation:fade .12s}
+.main.pop.reading .r-wrap{max-width:920px;margin:0 auto;background:var(--panel);border-radius:14px;box-shadow:var(--shadow);min-height:100%}
+.main.pop.reading .r-bar{border-radius:14px 14px 0 0;top:-22px}
+.main.pop .r-back{display:none}
+.main.pop.reading .r-x{display:grid;position:fixed;top:18px;left:18px;z-index:46;width:40px;height:40px;place-items:center;border-radius:50%;color:#fff;background:rgba(255,255,255,.12)}
+.main.pop.reading .r-nav{display:grid;position:fixed;top:50%;transform:translateY(-50%);z-index:46;width:48px;height:48px;place-items:center;border-radius:50%;color:#fff;background:rgba(255,255,255,.12)}
+.main.pop.reading .r-nav .ico,.main.pop.reading .r-x .ico{width:24px;height:24px}
+.main.pop.reading .r-nav:hover,.main.pop.reading .r-x:hover{background:rgba(255,255,255,.25)}
+.main.pop.reading .r-nav.prev{right:14px}
+.main.pop.reading .r-nav.next{left:14px}
 @media (max-width:760px){
-  .main.cards-mode.reading .reader{padding:0}
-  .main.cards-mode.reading .r-wrap{border-radius:0}
-  .main.cards-mode.reading .r-bar{border-radius:0;top:0}
-  .main.cards-mode.reading .r-nav,.main.cards-mode.reading .r-x{display:none}
-  .main.cards-mode .r-back{display:grid}
+  .main.pop.reading .reader{padding:0}
+  .main.pop.reading .r-wrap{border-radius:0}
+  .main.pop.reading .r-bar{border-radius:0;top:0}
+  .main.pop.reading .r-nav,.main.pop.reading .r-x{display:none}
+  .main.pop .r-back{display:grid}
   .tagpop{width:calc(100vw - 16px)}
   .mt-r{grid-template-columns:100px 1fr}
 }
+/* =========================================================
+   المرحلة الأولى: شريط الأيقونات واللوحات ولوحة البداية (على طريقة Inoreader)
+   ========================================================= */
+:root{--rail:#e9ece8}
+[data-theme="dark"]{--rail:#0f1210}
+/* شريط الأيقونات */
+.rail{display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 0 12px;background:var(--rail);border-left:1px solid var(--line);overflow-y:auto;overflow-x:hidden;min-height:0;z-index:20}
+.rl{position:relative;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:var(--tx2);flex:none}
+.rl:hover{background:var(--hover);color:var(--tx)}
+.rl.on{background:var(--ac2);color:var(--ac)}
+.rl .ico{width:22px;height:22px}
+.rl .bdg{position:absolute;top:1px;left:-3px;min-width:18px;height:17px;padding:0 4px;border-radius:9px;background:var(--panel);border:1px solid var(--line);font-size:10px;line-height:15px;color:var(--tx2);font-weight:700;font-variant-numeric:tabular-nums;direction:ltr}
+.rl.on .bdg{border-color:var(--ac);color:var(--ac)}
+.rl-logo{margin-bottom:8px}
+.rl-logo:hover{background:none}
+.rl-logo .logo{width:38px;height:38px;border-radius:10px;display:block}
+.rl-sp{flex:1;min-height:12px}
+.rl-me .av{width:30px;height:30px;border-radius:50%;background:var(--ac);color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px}
+.rl-col.off .ico{transform:scaleX(-1)}
+.content{display:flex;flex-direction:column;min-height:0;min-width:0}
+/* اللوحة الجانبية */
+.side h4.ph{margin:2px 6px 10px;font-size:16px;color:var(--tx);font-weight:700}
+.side h4.ph button{width:28px;height:28px}
+.p-alert{display:flex;width:100%;gap:8px;align-items:center;text-align:right;background:#fdecea;color:#8f2a20;border-radius:10px;padding:9px 12px;margin:0 0 10px;font-size:13px;font-weight:600}
+.p-alert:hover{filter:brightness(.97)}
+.p-alert .ico{color:var(--danger)}
+[data-theme="dark"] .p-alert{background:#3a1d1a;color:#f2b8b0}
+.main.nopanel{grid-template-columns:var(--w-list) minmax(0,1fr)}
+.main.nopanel.cards-mode,.main.dash-mode{grid-template-columns:minmax(0,1fr)}
+.main.nopanel #rs-list{right:var(--w-list)}
+@media (min-width:761px){
+  .main.nopanel .side,.main.dash-mode .side{display:none}
+  .main.nopanel #rs-side,.main.dash-mode .col-rs{display:none}
+}
+/* رأس القائمة */
+.list{container-type:inline-size}
+.list-h{flex-wrap:wrap;gap:8px;padding:9px 12px}
+#list-h{display:flex;align-items:center;gap:8px;flex:1 0 auto;max-width:100%;min-width:0}
+#list-h2{display:flex;align-items:center;gap:4px}
+.lh-s{flex:1 1 170px;max-width:320px}
+.lh-s input{height:34px;padding:0 34px 0 10px}
+.lh-s .ico{top:8px;right:10px}
+.ma-g{display:inline-flex;flex:none}
+.ma-g .ma{border-radius:0 9px 9px 0}
+.ma-g .ma-dd{border-radius:9px 0 0 9px;border-right:0;padding:0 6px}
+.ico.dn{transform:rotate(-90deg)}
+.seg button{white-space:nowrap}
+.seg button b{font-weight:600;color:var(--ac);margin-inline-start:3px;font-variant-numeric:tabular-nums}
+@container (max-width:640px){ .ma .t{display:none} }
+/* أدوات المقالة في القائمة والبطاقات */
+.it-acts{display:flex;align-items:center;gap:2px}
+.it-acts .sp{flex:1}
+.it-time{font-size:12px;color:var(--tx3);padding-inline-start:4px}
+.ia{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:var(--tx3)}
+.ia:hover{background:var(--line2);color:var(--tx)}
+.ia.on{color:var(--later)}
+.ia .ico{width:17px;height:17px}
+.items:not(.cards) .it-acts{position:absolute;left:8px;top:6px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:1px;box-shadow:0 2px 8px rgba(0,0,0,.08);display:none;z-index:1}
+.items:not(.cards) .it:hover .it-acts{display:flex}
+.items:not(.cards) .it-acts .it-time,.items:not(.cards) .it-acts .sp{display:none}
+@media (hover:none){ .items:not(.cards) .it-acts{display:none!important} }
+.items.cards .it-main{display:flex;flex-direction:column}
+.items.cards .it-title{order:1}
+.items.cards .it-meta{order:2;margin:6px 0 0}
+.items.cards .it-meta .tm{display:none}
+.items.cards .it-acts{padding:0 8px 8px 10px;margin-top:-4px}
+/* لوحة البداية */
+.dash{display:none;overflow:auto;min-width:0;background:var(--bg)}
+.main.dash-mode .dash{display:block}
+.main.dash-mode .list{display:none!important}
+.dash-in{max-width:1500px;margin:0 auto;padding:22px 26px 60px}
+.dash-h{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.dash-h h1{margin:0;font-size:24px;line-height:1.4}
+.dash-d{color:var(--tx3);font-size:13px}
+.dash-h .sp{flex:1}
+.dash-st{display:flex;gap:8px;flex-wrap:wrap}
+.dash-st button{display:flex;align-items:baseline;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font-size:13px;color:var(--tx2)}
+.dash-st button b{font-size:17px;color:var(--tx);font-variant-numeric:tabular-nums}
+.dash-st button:hover{border-color:var(--ac)}
+.dash-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;align-items:start}
+.dw{background:var(--panel);border:1px solid var(--line);border-radius:14px;min-width:0}
+.dw.wide{grid-column:span 2}
+@media (max-width:900px){ .dw.wide{grid-column:auto} }
+.dw-h{display:flex;align-items:center;gap:8px;padding:12px 14px 8px}
+.dw-h>.ico{color:var(--ac)}
+.dw-h h3{margin:0;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 0 auto;max-width:60%}
+.dw-c{font-size:12px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 100 auto}
+.dw-h .sp{flex:1}
+.dw-h .lnk{white-space:nowrap}
+.dw-h .ibtn{width:30px;height:30px;flex:none}
+.dw-b{padding:0 6px 8px}
+.dw-i{display:flex;gap:10px;padding:8px;border-radius:10px;cursor:pointer;align-items:flex-start}
+.dw-i:hover{background:var(--hover)}
+.dw-th{width:72px;height:54px;border-radius:8px;object-fit:cover;flex:none;background:var(--line2)}
+.dw.wide .dw-th{width:116px;height:78px}
+.dw-m{flex:1;min-width:0}
+.dw-t{font-size:14px;line-height:1.55;color:var(--tx2);font-weight:500;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dw-i.unread .dw-t{color:var(--tx);font-weight:700}
+.dw-s{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--tx3);margin-top:3px;white-space:nowrap;overflow:hidden}
+.dw-s img{width:13px;height:13px;border-radius:3px;flex:none}
+.dw-s .src{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.dw-x{font-size:13px;color:var(--tx3);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:3px}
+.dw-pg{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:11.5px;color:var(--tx3);font-variant-numeric:tabular-nums}
+.dw-pg i{flex:1;height:4px;border-radius:4px;background:var(--line);position:relative;overflow:hidden}
+.dw-pg i b{position:absolute;top:0;bottom:0;right:0;background:var(--ac);border-radius:4px}
+.dw-e{padding:14px 12px 18px;color:var(--tx3);font-size:13.5px;text-align:center}
+.dw-f{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:9px;cursor:pointer;font-size:14px}
+.dw-f:hover{background:var(--hover)}
+.dw-f img{width:16px;height:16px;border-radius:3px;flex:none}
+.dw-f .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dw-f .cnt{font-size:12px;color:var(--ac);font-weight:600;font-variant-numeric:tabular-nums}
+.dw-f .bad{font-size:11px;color:var(--danger);background:#fbe9e7;border-radius:6px;padding:0 6px;white-space:nowrap}
+[data-theme="dark"] .dw-f .bad{background:#3a1d1a}
+.dw-foot{display:flex;align-items:center;gap:8px;padding:8px 10px 2px;font-size:12px;color:var(--tx3);border-top:1px solid var(--line2);margin-top:4px}
+.dw-sw{width:11px;height:11px;border-radius:50%;flex:none}
+.dw-off{font-size:11px;color:var(--tx3);border:1px solid var(--line);border-radius:6px;padding:0 6px}
+.dc-row{display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px}
+.dc-row .rb{flex:1;min-width:0}
+.dc-row .ibtn{width:32px;height:32px}
+/* الجوال: الشريط يصبح شريطاً سفلياً */
+@media (max-width:760px){
+  #app{grid-template-columns:minmax(0,1fr)}
+  .content{padding-bottom:58px}
+  .rail{position:fixed;bottom:0;left:0;right:0;height:58px;flex-direction:row;justify-content:space-around;padding:0 4px;border-left:0;border-top:1px solid var(--line);z-index:35;overflow:visible}
+  .rail .rl-logo,.rail .rl-sp{display:none}
+  .rl{width:46px;height:46px}
+  .rl .bdg{top:0;left:0}
+  .side{top:0!important;bottom:58px}
+  .main.cards-mode,.main.nopanel{grid-template-columns:minmax(0,1fr)}
+  .dash-in{padding:16px 12px 40px}
+  .dash-h h1{font-size:20px}
+  .dash-g{grid-template-columns:minmax(0,1fr)}
+  .lh-s{max-width:none}
+}
+@media (max-width:1100px){ .main.nopanel{grid-template-columns:minmax(0,1fr)} }
 </style>
 </head>
 <body>
 <div id="app">
-  <header class="top">
-    <button class="ibtn only-m" data-act="toggle-side" title="القائمة"><svg class="ico"><use href="#i-menu"/></svg></button>
-    <div class="brand"><div class="brand-mark"><svg width="30" height="30" viewBox="0 0 64 64"><path d="M23.67 13.76Q23.67 15.16 22.63 15.9Q21.6 16.63 19.59 16.63Q17.77 16.63 16.73 15.99Q15.69 15.34 15.39 14.03L17.32 13.71Q17.51 14.46 18.08 14.8Q18.64 15.14 19.65 15.14Q21.73 15.14 21.73 13.88Q21.73 13.47 21.49 13.21Q21.25 12.95 20.82 12.77Q20.38 12.6 19.15 12.35Q18.08 12.1 17.67 11.95Q17.25 11.79 16.91 11.59Q16.57 11.38 16.34 11.09Q16.1 10.8 15.97 10.41Q15.84 10.02 15.84 9.51Q15.84 8.23 16.81 7.54Q17.77 6.86 19.62 6.86Q21.39 6.86 22.27 7.41Q23.16 7.96 23.42 9.24L21.49 9.5Q21.34 8.89 20.89 8.58Q20.43 8.27 19.58 8.27Q17.77 8.27 17.77 9.4Q17.77 9.77 17.97 10.01Q18.16 10.24 18.54 10.41Q18.91 10.57 20.07 10.82Q21.43 11.11 22.02 11.36Q22.61 11.61 22.96 11.93Q23.3 12.26 23.48 12.71Q23.67 13.17 23.67 13.76ZM24.68 16.5V15.19Q25.06 14.37 25.74 13.59Q26.42 12.82 27.46 11.98Q28.46 11.17 28.86 10.64Q29.26 10.11 29.26 9.61Q29.26 8.37 28.02 8.37Q27.41 8.37 27.09 8.7Q26.77 9.02 26.67 9.68L24.77 9.57Q24.93 8.25 25.75 7.55Q26.58 6.86 28 6.86Q29.54 6.86 30.36 7.56Q31.18 8.26 31.18 9.53Q31.18 10.2 30.92 10.74Q30.66 11.27 30.25 11.73Q29.84 12.18 29.33 12.58Q28.83 12.98 28.36 13.36Q27.89 13.74 27.5 14.12Q27.11 14.5 26.92 14.94H31.33V16.5ZM38.22 14.56V16.5H36.42V14.56H32.09V13.14L36.11 7H38.22V13.16H39.49V14.56ZM36.42 10.05Q36.42 9.68 36.44 9.26Q36.46 8.83 36.48 8.71Q36.3 9.09 35.84 9.8L33.64 13.16H36.42ZM46.27 16.5 42.13 9.18Q42.26 10.25 42.26 10.9V16.5H40.49V7H42.76L46.96 14.38Q46.84 13.36 46.84 12.52V7H48.61V16.5Z" fill="#fff"/><path d="M28.42 55.5 20.53 42.59H12.18V55.5H5.07V21.5H22.05Q28.13 21.5 31.44 24.12Q34.75 26.74 34.75 31.63Q34.75 35.21 32.72 37.8Q30.69 40.39 27.24 41.21L36.43 55.5ZM27.58 31.92Q27.58 27.03 21.31 27.03H12.18V37.06H21.5Q24.49 37.06 26.03 35.71Q27.58 34.36 27.58 31.92Z" fill="#FF9A2E"/><path d="M41.93 31.02a7.98 7.98 0 0 1 7.98 7.98M41.93 24.5a14.5 14.5 0 0 1 14.5 14.5" fill="none" stroke="#FF9A2E" stroke-width="5" stroke-linecap="round"/><circle cx="41.93" cy="39" r="3" fill="#FF9A2E"/></svg></div><span dir="ltr">S24N<b>Reader</b></span></div>
-    <div class="search"><svg class="ico"><use href="#i-search"/></svg><input id="q" type="search" placeholder="ابحث في المقالات…  ( / )" autocomplete="off"></div>
-    <div class="top-acts">
-      <button class="ibtn" data-act="refresh" title="تحديث (r)"><svg class="ico" id="refresh-ico"><use href="#i-refresh"/></svg></button>
-      <button class="btn pri hide-m" data-act="add-feed"><svg class="ico"><use href="#i-plus"/></svg>إضافة مصدر</button>
-      <button class="ibtn only-m" data-act="add-feed" title="إضافة مصدر"><svg class="ico"><use href="#i-plus"/></svg></button>
-      <button class="ibtn" data-act="theme" id="theme-btn" title="الوضع الليلي"><svg class="ico"><use href="#i-moon"/></svg></button>
-      <button class="ibtn" data-act="settings" title="الإعدادات"><svg class="ico"><use href="#i-gear"/></svg></button>
-    </div>
-  </header>
-  <div style="display:flex;flex-direction:column;min-height:0">
+  <nav class="rail" id="rail"></nav>
+  <div class="content">
     <div id="banner" class="banner hidden"></div>
     <div class="main" id="main" style="flex:1">
       <aside class="side" id="side"></aside>
       <section class="list">
-        <div class="list-h" id="list-h"></div>
+        <div class="list-h"><div id="list-h"></div><div class="search lh-s"><svg class="ico"><use href="#i-search"/></svg><input id="q" type="search" placeholder="ابحث في المقالات…  ( / )" autocomplete="off"></div><div id="list-h2"></div><button class="ibtn lh-r" data-act="refresh" title="تحديث (r)"><svg class="ico refresh-ico" id="refresh-ico"><use href="#i-refresh"/></svg></button></div>
         <div class="items" id="items"></div>
       </section>
       <section class="reader" id="reader"></section>
+      <section class="dash" id="dash"></section>
       <div class="col-rs" id="rs-side" title="اسحب لتغيير العرض — نقرتان للعرض الافتراضي"></div>
       <div class="col-rs" id="rs-list" title="اسحب لتغيير العرض — نقرتان للعرض الافتراضي"></div>
     </div>
@@ -407,6 +530,16 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
   <symbol id="i-unread" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></symbol>
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
   <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-logo" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#0f7b4b"/><path d="M23.67 13.76Q23.67 15.16 22.63 15.9Q21.6 16.63 19.59 16.63Q17.77 16.63 16.73 15.99Q15.69 15.34 15.39 14.03L17.32 13.71Q17.51 14.46 18.08 14.8Q18.64 15.14 19.65 15.14Q21.73 15.14 21.73 13.88Q21.73 13.47 21.49 13.21Q21.25 12.95 20.82 12.77Q20.38 12.6 19.15 12.35Q18.08 12.1 17.67 11.95Q17.25 11.79 16.91 11.59Q16.57 11.38 16.34 11.09Q16.1 10.8 15.97 10.41Q15.84 10.02 15.84 9.51Q15.84 8.23 16.81 7.54Q17.77 6.86 19.62 6.86Q21.39 6.86 22.27 7.41Q23.16 7.96 23.42 9.24L21.49 9.5Q21.34 8.89 20.89 8.58Q20.43 8.27 19.58 8.27Q17.77 8.27 17.77 9.4Q17.77 9.77 17.97 10.01Q18.16 10.24 18.54 10.41Q18.91 10.57 20.07 10.82Q21.43 11.11 22.02 11.36Q22.61 11.61 22.96 11.93Q23.3 12.26 23.48 12.71Q23.67 13.17 23.67 13.76ZM24.68 16.5V15.19Q25.06 14.37 25.74 13.59Q26.42 12.82 27.46 11.98Q28.46 11.17 28.86 10.64Q29.26 10.11 29.26 9.61Q29.26 8.37 28.02 8.37Q27.41 8.37 27.09 8.7Q26.77 9.02 26.67 9.68L24.77 9.57Q24.93 8.25 25.75 7.55Q26.58 6.86 28 6.86Q29.54 6.86 30.36 7.56Q31.18 8.26 31.18 9.53Q31.18 10.2 30.92 10.74Q30.66 11.27 30.25 11.73Q29.84 12.18 29.33 12.58Q28.83 12.98 28.36 13.36Q27.89 13.74 27.5 14.12Q27.11 14.5 26.92 14.94H31.33V16.5ZM38.22 14.56V16.5H36.42V14.56H32.09V13.14L36.11 7H38.22V13.16H39.49V14.56ZM36.42 10.05Q36.42 9.68 36.44 9.26Q36.46 8.83 36.48 8.71Q36.3 9.09 35.84 9.8L33.64 13.16H36.42ZM46.27 16.5 42.13 9.18Q42.26 10.25 42.26 10.9V16.5H40.49V7H42.76L46.96 14.38Q46.84 13.36 46.84 12.52V7H48.61V16.5Z" fill="#fff"/><path d="M28.42 55.5 20.53 42.59H12.18V55.5H5.07V21.5H22.05Q28.13 21.5 31.44 24.12Q34.75 26.74 34.75 31.63Q34.75 35.21 32.72 37.8Q30.69 40.39 27.24 41.21L36.43 55.5ZM27.58 31.92Q27.58 27.03 21.31 27.03H12.18V37.06H21.5Q24.49 37.06 26.03 35.71Q27.58 34.36 27.58 31.92Z" fill="#FF9A2E"/><path d="M41.93 31.02a7.98 7.98 0 0 1 7.98 7.98M41.93 24.5a14.5 14.5 0 0 1 14.5 14.5" fill="none" stroke="#FF9A2E" stroke-width="5" stroke-linecap="round"/><circle cx="41.93" cy="39" r="3" fill="#FF9A2E"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></symbol>
+  <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></symbol>
+  <symbol id="i-rdot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.3" fill="currentColor"/></symbol>
+  <symbol id="i-dbl" viewBox="0 0 24 24"><path d="m11 17-5-5 5-5M18 17l-5-5 5-5"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
 </svg>
 
 <script>
@@ -503,18 +636,21 @@ function toastUndo(msg, undoFn, ms = 10000) {
 const workerUrl = () => (CONFIG.WORKER_URL || lsGet('s24r_worker', '') || '').replace(/\/+$/, '');
 
 /* ---------- الحالة ---------- */
-const DEFAULT_SETTINGS = { theme: 'auto', refreshMin: 15, autoRead: true, view: 'list', listFilter: 'unread', sort: 'new' };
+const DEFAULT_SETTINGS = { theme: 'auto', refreshMin: 15, autoRead: true, view: 'list', listFilter: 'unread', sort: 'new', start: 'dash' };
 let S = { folders: {}, feeds: {}, rules: {}, states: {}, saved: {}, drafts: {}, tags: {}, itags: {}, notes: {}, settings: { ...DEFAULT_SETTINGS } };
 const ITEMS = new Map();          // id → مقالة
 const FEED_STATUS = {};           // feedId → {fetchedAt, error, loading}
 const FULLTEXT = new Map();       // id → html
-let VIEW = { type: 'all' };       // all | starred | later | drafts | folder | feed
+let VIEW = { type: 'all' };       // dash | all | starred | later | drafts | folder | feed | rule | tag
 let SEL = null;                   // المقالة/المسودة المختارة
 let QUERY = '';
 let USER = null;
 let REFRESHING = false;
 const collapsed = new Set(lsGet('s24r_collapsed', []));
 let DRAG = null;                  // حالة سحب مصدر في الشريط الجانبي
+let PANEL_OFF = lsGet('s24r_nopanel', false);   // إخفاء اللوحة الجانبية (لكل جهاز)
+const KEEP_VIS = new Set();       // مقالات قُرئت في هذه الصفحة: تبقى ظاهرة حتى الانتقال إلى قسم آخر
+let DASH_CTX = [];                // ترتيب مقالات المربع الذي فُتحت منه المقالة في لوحة البداية (للسابقة والتالية)
 const setting = k => (S.settings && S.settings[k] != null) ? S.settings[k] : DEFAULT_SETTINGS[k];
 
 /* ---------- التخزين: محلي أو Firebase ---------- */
@@ -862,11 +998,11 @@ async function refreshFeed(feedId) {
 async function refreshAll() {
   if (REFRESHING) return; const ids = Object.keys(S.feeds); if (!ids.length) return;
   if (!workerUrl()) { showBanner(); return; }
-  REFRESHING = true; $('#refresh-ico').classList.add('spin');
+  REFRESHING = true; $$('.refresh-ico').forEach(e => e.classList.add('spin'));
   const q = [...ids];
   await Promise.all(Array.from({ length: Math.min(CONFIG.CONCURRENCY, q.length) }, async () => { while (q.length) await refreshFeed(q.shift()); }));
-  REFRESHING = false; $('#refresh-ico').classList.remove('spin');
-  lsSet('s24r_last_refresh', Date.now());
+  REFRESHING = false; $$('.refresh-ico').forEach(e => e.classList.remove('spin'));
+  lsSet('s24r_last_refresh', Date.now()); scheduleRender();
 }
 
 /* =========================================================
@@ -953,14 +1089,11 @@ function setFlag(id, flag, on) {
   Store.update(upd); scheduleRender();
 }
 const toggleFlag = (id, f) => setFlag(id, f, !st(id)[f]);
-function markAllRead() {
-  const list = currentItems(); if (!list.length) return;
-  const upd = {}, prev = {}; const now = Date.now();
-  list.forEach(it => { if (!isRead(it.id)) { const k = 'states/' + it.id; prev[k] = S.states[it.id] ? { ...S.states[it.id] } : null; upd[k] = { ...st(it.id), r: 1, t: now }; } });
-  const n = Object.keys(upd).length; if (!n) return toast('لا توجد مقالات غير مقروءة هنا');
-  Store.update(upd); scheduleRender();
-  // حفظ الحالة السابقة لإعادتها كما كانت تماماً عند التراجع
-  toastUndo(`عُلِّمت ${n} مقالة كمقروءة`, () => { Store.update(prev); scheduleRender(); });
+// olderMs: تعليم ما هو أقدم من مدة معيّنة فقط (من قائمة السهم بجانب الزر)
+function markAllRead(olderMs) {
+  let list = currentItems(); if (olderMs) { const lim = Date.now() - olderMs; list = list.filter(it => it.date < lim); }
+  if (!list.length) return toast('لا توجد مقالات غير مقروءة هنا');
+  markRead(list);
 }
 function pruneStates() { // حذف حالات المقالات القديمة التي لم تعد في الذاكرة
   const cutoff = Date.now() - 45 * 86400e3; const upd = {};
@@ -985,8 +1118,9 @@ function unreadCounts() {
   return { feed, folder, rule, total };
 }
 
-function currentItems() {
+function currentItems(opts = {}) {
   let list;
+  if (VIEW.type === 'dash') return DASH_CTX.map(getItem).filter(Boolean).map(it => ITEMS.get(it.id) || it);
   if (VIEW.type === 'tag') {
     list = Object.entries(S.itags || {}).filter(([, t]) => t && t[VIEW.id]).map(([id]) => getItem(id)).filter(Boolean).map(it => ITEMS.get(it.id) || it);
   } else if (VIEW.type === 'starred' || VIEW.type === 'later') {
@@ -1001,7 +1135,7 @@ function currentItems() {
       const r = S.rules[VIEW.id]; const pr = r ? prepRule(VIEW.id, r) : null;
       list = pr ? list.filter(it => ruleHit(pr, it)) : [];
     } else list = list.filter(it => !isHidden(it));
-    if (setting('listFilter') === 'unread') list = list.filter(it => !isRead(it.id) || it.id === SEL);
+    if (setting('listFilter') === 'unread' && !opts.all) list = list.filter(it => !isRead(it.id) || it.id === SEL || KEEP_VIS.has(it.id));
   }
   if (QUERY) { const q = normAr(QUERY); list = list.filter(it => normAr(it.title + ' ' + (it.text || '')).includes(q)); }
   const dir = setting('sort') === 'old' ? 1 : -1;
@@ -1009,6 +1143,7 @@ function currentItems() {
 }
 
 function viewTitle() {
+  if (VIEW.type === 'dash') return 'لوحة البداية';
   if (VIEW.type === 'all') return 'كل المقالات';
   if (VIEW.type === 'starred') return 'المميّزة بنجمة';
   if (VIEW.type === 'later') return 'للقراءة لاحقاً';
@@ -1020,74 +1155,109 @@ function viewTitle() {
   return '';
 }
 
+// اللوحة الجانبية حسب القسم: «المحفوظات» للنجمة واللاحق والوسوم، و«المصادر» لغيرها
+function panelKind() { return ['starred', 'later', 'tag'].includes(VIEW.type) ? 'saved' : 'feeds'; }
+function railKind() { return VIEW.type === 'dash' || VIEW.type === 'drafts' ? VIEW.type : panelKind(); }
+const fmtN = n => !n ? '' : n >= 1000 ? (n >= 10000 ? Math.floor(n / 1000) : (Math.floor(n / 100) / 10)) + 'k' : String(n);
+const countSaved = f => Object.values(S.saved || {}).filter(it => st(it.id)[f]).length;
+function applyPanel() { $('#main').classList.toggle('nopanel', PANEL_OFF || VIEW.type === 'dash' || VIEW.type === 'drafts'); }
+function togglePanel() { PANEL_OFF = !PANEL_OFF; lsSet('s24r_nopanel', PANEL_OFF); renderSide(); }
+
+function renderRail(UC) {
+  const k = railKind(), dark = document.documentElement.dataset.theme === 'dark';
+  const b = (key, icon, title, badge = '', cls = '') => `<button class="rl${k === key ? ' on' : ''}${cls}" data-act="rail" data-k="${key}" title="${title}">${ico(icon)}${badge ? `<span class="bdg">${badge}</span>` : ''}</button>`;
+  const me = USER ? ((USER.displayName || USER.email || '?').trim()[0] || '?').toUpperCase() : '';
+  $('#rail').innerHTML = `<button class="rl rl-logo hide-m" data-act="rail" data-k="dash" title="${esc(CONFIG.APP_NAME)}"><svg class="logo" viewBox="0 0 64 64"><use href="#i-logo"/></svg></button>`
+    + b('dash', 'home', 'لوحة البداية')
+    + b('feeds', 'rss', 'المصادر', fmtN(UC.total))
+    + b('saved', 'bookmark', 'المحفوظات', fmtN(countSaved('l')))
+    + b('drafts', 'pen', 'المسودات', fmtN(Object.keys(S.drafts || {}).length))
+    + b('search', 'search', 'البحث ( / )', '', ' hide-m')
+    + b('add', 'plus', 'إضافة مصدر')
+    + `<span class="rl-sp"></span>`
+    + `<button class="rl hide-m" data-act="theme" id="theme-btn" title="${dark ? 'الوضع النهاري' : 'الوضع الليلي'}">${ico(dark ? 'sun' : 'moon')}</button>`
+    + `<button class="rl hide-m" data-act="settings" title="الإعدادات">${ico('gear')}</button>`
+    + `<button class="rl rl-me" data-act="me-menu" title="${esc(USER ? (USER.email || USER.displayName || '') : 'وضع محلي')}">${me ? `<span class="av">${esc(me)}</span>` : ico('user')}</button>`
+    + `<button class="rl hide-m rl-col${PANEL_OFF ? ' off' : ''}" data-act="toggle-panel" title="${PANEL_OFF ? 'إظهار اللوحة الجانبية' : 'إخفاء اللوحة الجانبية'}">${ico('dbl')}</button>`;
+}
+
 function renderSide(force) {
   if (DRAG && DRAG.on && !force) { DRAG.pending = true; return; }
-  const act = (t, id) => VIEW.type === t && (id == null || VIEW.id === id) ? ' act' : '';
   const UC = unreadCounts(); const total = UC.total;
-  const countSaved = f => Object.values(S.saved || {}).filter(it => st(it.id)[f]).length;
+  renderRail(UC); applyPanel();
+  const act = (t, id) => VIEW.type === t && (id == null || VIEW.id === id) ? ' act' : '';
   const nav = (t, icon, label, cnt, id) => `<div class="nav-i${act(t, id)}${cnt && t === 'all' ? ' has-unread' : ''}" data-view="${t}"${id ? ` data-id="${esc(id)}"` : ''}>${ico(icon)}<span class="lbl">${label}</span><span class="cnt">${cnt || ''}</span></div>`;
-  let h = nav('all', 'inbox', 'كل المقالات', total) + nav('starred', 'star', 'المميّزة بنجمة', countSaved('s')) + nav('later', 'clock', 'للقراءة لاحقاً', countSaved('l')) + nav('drafts', 'pen', 'المسودات', Object.keys(S.drafts || {}).length);
-
-  const feedRow = ([id, f]) => {
-    const n = UC.feed[id] || 0; const err = FEED_STATUS[id] && FEED_STATUS[id].error;
-    return `<div class="nav-i${act('feed', id)}${n ? ' has-unread' : ''}" data-view="feed" data-id="${esc(id)}" data-drag="feed" title="${esc(err || f.url)}">
-      <img class="fav" src="${esc(favicon(f.siteUrl || f.url))}" alt="" draggable="false" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
-      <span class="lbl">${esc(f.title || hostOf(f.url))}</span>${err ? '<span class="err"></span>' : ''}<span class="cnt">${n || ''}</span>
-      <button class="more" data-act="feed-menu" data-id="${esc(id)}" title="خيارات">${ico('more')}</button></div>`;
-  };
-  h += `<h4 data-drop="root">المصادر <span><button data-act="new-folder" title="مجلد جديد">${ico('folder')}</button> <button data-act="add-feed" title="إضافة مصدر">${ico('plus')}</button></span></h4>`;
-  const folders = Object.entries(S.folders || {}).sort((a, b) => (a[1].order || 0) - (b[1].order || 0) || a[1].name.localeCompare(b[1].name, 'ar'));
-  for (const [fid, fo] of folders) {
-    const n = UC.folder[fid] || 0;
-    h += `<div class="folder${collapsed.has(fid) ? ' collapsed' : ''}">
-      <div class="nav-i${act('folder', fid)}${n ? ' has-unread' : ''}" data-view="folder" data-id="${esc(fid)}">
-        <span data-act="toggle-folder" data-id="${esc(fid)}" style="display:grid">${ico('chev', 'chev')}</span><span class="fico" style="${fo.color ? `color:${esc(fo.color)}` : ''}">${ico('folder')}</span>
-        <span class="lbl">${esc(fo.name)}</span><span class="cnt">${n || ''}</span>
-        <button class="more" data-act="folder-menu" data-id="${esc(fid)}">${ico('more')}</button></div>
-      <div class="kids">${feedsInFolder(fid).map(feedRow).join('') || '<div class="side-foot">لا مصادر</div>'}</div></div>`;
+  let h;
+  if (panelKind() === 'saved') {
+    h = `<h4 class="ph">المحفوظات</h4>` + nav('later', 'clock', 'للقراءة لاحقاً', countSaved('l')) + nav('starred', 'star', 'المميّزة بنجمة', countSaved('s'));
+    const tags = tagsSorted(), tc = tagCounts();
+    h += `<h4>الوسوم <span><button data-act="tag-new" title="وسم جديد">${ico('plus')}</button></span></h4>`;
+    h += tags.length ? tags.map(([tid, t]) => `<div class="nav-i${act('tag', tid)}" data-view="tag" data-id="${esc(tid)}">${ico('tag')}<span class="lbl">${esc(t.name)}</span><span class="cnt">${tc[tid] || ''}</span>
+      <button class="more" data-act="tag-menu" data-id="${esc(tid)}" title="خيارات">${ico('more')}</button></div>`).join('')
+      : `<div class="side-foot">لا وسوم بعد. أضف وسماً لأي مقالة من زر ${ico('tag')} في شريطها.</div>`;
+  } else {
+    const feedRow = ([id, f]) => {
+      const n = UC.feed[id] || 0; const err = FEED_STATUS[id] && FEED_STATUS[id].error;
+      return `<div class="nav-i${act('feed', id)}${n ? ' has-unread' : ''}" data-view="feed" data-id="${esc(id)}" data-drag="feed" title="${esc(err || f.url)}">
+        <img class="fav" src="${esc(favicon(f.siteUrl || f.url))}" alt="" draggable="false" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
+        <span class="lbl">${esc(f.title || hostOf(f.url))}</span>${err ? '<span class="err"></span>' : ''}<span class="cnt">${n || ''}</span>
+        <button class="more" data-act="feed-menu" data-id="${esc(id)}" title="خيارات">${ico('more')}</button></div>`;
+    };
+    h = `<h4 class="ph" data-drop="root">المصادر <span><button data-act="new-folder" title="مجلد جديد">${ico('folder')}</button> <button data-act="add-feed" title="إضافة مصدر">${ico('plus')}</button></span></h4>`;
+    const errs = Object.keys(S.feeds).filter(id => FEED_STATUS[id] && FEED_STATUS[id].error).length;
+    if (errs) h += `<button class="p-alert" data-act="feed-errors">${ico('alert')}<span>${errs === 1 ? 'مصدر واحد لا يُحدَّث' : errs + ' مصادر لا تُحدَّث'} — اضغط للتفاصيل</span></button>`;
+    h += nav('all', 'inbox', 'كل المقالات', total);
+    const folders = Object.entries(S.folders || {}).sort((a, b) => (a[1].order || 0) - (b[1].order || 0) || a[1].name.localeCompare(b[1].name, 'ar'));
+    for (const [fid, fo] of folders) {
+      const n = UC.folder[fid] || 0;
+      h += `<div class="folder${collapsed.has(fid) ? ' collapsed' : ''}">
+        <div class="nav-i${act('folder', fid)}${n ? ' has-unread' : ''}" data-view="folder" data-id="${esc(fid)}">
+          <span data-act="toggle-folder" data-id="${esc(fid)}" style="display:grid">${ico('chev', 'chev')}</span><span class="fico" style="${fo.color ? `color:${esc(fo.color)}` : ''}">${ico('folder')}</span>
+          <span class="lbl">${esc(fo.name)}</span><span class="cnt">${n || ''}</span>
+          <button class="more" data-act="folder-menu" data-id="${esc(fid)}">${ico('more')}</button></div>
+        <div class="kids">${feedsInFolder(fid).map(feedRow).join('') || '<div class="side-foot">لا مصادر</div>'}</div></div>`;
+    }
+    h += feedsInFolder('').map(feedRow).join('');
+    if (!Object.keys(S.feeds).length) h += `<div class="side-foot">لم تُضف أي مصدر بعد.</div>`;
+    h += `<h4>الفلاتر <span><button data-act="rules" title="إدارة القواعد">${ico('gear')}</button> <button data-act="rule-new" title="فلتر جديد">${ico('plus')}</button></span></h4>`;
+    const rules = Object.entries(S.rules || {});
+    h += rules.length ? rules.map(([rid, r]) => { const n = UC.rule[rid] || 0;
+      return `<div class="nav-i${act('rule', rid)}${n ? ' has-unread' : ''}${r.enabled === false ? ' off' : ''}" data-view="rule" data-id="${esc(rid)}" title="${esc((r.keywords || []).join('، '))}">
+        <span class="sw" style="background:${esc(r.color || '#999')}"></span><span class="lbl">${esc(r.name)}</span><span class="cnt">${n || ''}</span>
+        <button class="more" data-act="rule-edit" data-id="${esc(rid)}" title="تعديل">${ico('pen')}</button></div>`; }).join('')
+      : `<div class="nav-i" data-act="rule-new">${ico('filter')}<span class="lbl">أنشئ أول فلتر…</span></div>`;
   }
-  h += feedsInFolder('').map(feedRow).join('');
-  if (!Object.keys(S.feeds).length) h += `<div class="side-foot">لم تُضف أي مصدر بعد.</div>`;
-  h += `<h4>الفلاتر <span><button data-act="rules" title="إدارة القواعد">${ico('gear')}</button> <button data-act="rule-new" title="فلتر جديد">${ico('plus')}</button></span></h4>`;
-  const rules = Object.entries(S.rules || {});
-  h += rules.length ? rules.map(([rid, r]) => { const n = UC.rule[rid] || 0;
-    return `<div class="nav-i${act('rule', rid)}${n ? ' has-unread' : ''}${r.enabled === false ? ' off' : ''}" data-view="rule" data-id="${esc(rid)}" title="${esc((r.keywords || []).join('، '))}">
-      <span class="sw" style="background:${esc(r.color || '#999')}"></span><span class="lbl">${esc(r.name)}</span><span class="cnt">${n || ''}</span>
-      <button class="more" data-act="rule-edit" data-id="${esc(rid)}" title="تعديل">${ico('pen')}</button></div>`; }).join('')
-    : `<div class="nav-i" data-act="rule-new">${ico('filter')}<span class="lbl">أنشئ أول فلتر…</span></div>`;
-  const tags = tagsSorted();
-  if (tags.length) {
-    const tc = tagCounts();
-    h += `<h4>الوسوم</h4>` + tags.map(([tid, t]) => `<div class="nav-i${act('tag', tid)}" data-view="tag" data-id="${esc(tid)}">${ico('tag')}<span class="lbl">${esc(t.name)}</span><span class="cnt">${tc[tid] || ''}</span>
-      <button class="more" data-act="tag-menu" data-id="${esc(tid)}" title="خيارات">${ico('more')}</button></div>`).join('');
-  }
-  h += `<h4>أدوات</h4><div class="nav-i" data-act="settings">${ico('gear')}<span class="lbl">الإعدادات</span></div>`;
-  h += USER
-    ? `<div class="side-foot acct"><span class="lbl" title="${esc(USER.email || '')}">${esc(USER.email || USER.displayName || '')}</span><button class="btn sm" data-act="logout">تسجيل الخروج</button></div>`
-    : `<div class="side-foot">وضع محلي — البيانات في هذا المتصفح</div>`;
+  if (!USER) h += `<div class="side-foot">وضع محلي — البيانات في هذا المتصفح</div>`;
   $('#side').innerHTML = h;
 }
 
 function renderListHead() {
   const isSaved = VIEW.type === 'starred' || VIEW.type === 'later' || VIEW.type === 'tag', isDrafts = VIEW.type === 'drafts';
-  let h = `<h2>${esc(viewTitle())}${QUERY ? ` <small style="color:var(--tx3);font-weight:400">— بحث: ${esc(QUERY)}</small>` : ''}</h2>`;
+  let h = `<h2>${esc(viewTitle())}${QUERY ? ` <small style="color:var(--tx3);font-weight:400">— بحث: ${esc(QUERY)}</small>` : ''}</h2>`, h2 = '';
   if (isDrafts) h += `<button class="btn sm" data-act="new-draft">${ico('plus')}مسودة</button>`;
   else {
-    if (!isSaved) h += `<div class="seg"><button data-act="lf" data-v="unread" class="${setting('listFilter') === 'unread' ? 'on' : ''}">غير المقروء</button><button data-act="lf" data-v="all" class="${setting('listFilter') === 'all' ? 'on' : ''}">الكل</button></div>`;
-    h += `<div class="seg" title="طريقة العرض"><button data-act="view-mode" data-v="list" class="${setting('view') !== 'cards' ? 'on' : ''}" title="قائمة">${ico('list')}</button><button data-act="view-mode" data-v="cards" class="${setting('view') === 'cards' ? 'on' : ''}" title="بطاقات">${ico('grid')}</button></div>`;
-    if (!isSaved) h += `<button class="ibtn" data-act="mark-all" title="تعليم الكل كمقروء">${ico('checks')}</button>`;
-    if (VIEW.type === 'feed') h += `<button class="ibtn" data-act="feed-menu" data-id="${esc(VIEW.id)}" title="خيارات المصدر">${ico('more')}</button>`;
-    if (VIEW.type === 'tag') h += `<button class="ibtn" data-act="tag-menu" data-id="${esc(VIEW.id)}" title="خيارات الوسم">${ico('more')}</button>`;
-    if (VIEW.type === 'rule') h += `<button class="ibtn" data-act="rule-edit" data-id="${esc(VIEW.id)}" title="تعديل الفلتر">${ico('pen')}</button>`;
+    if (!isSaved) {
+      const un = currentItems({ all: true }).filter(it => !isRead(it.id)).length;
+      h += `<span class="ma-g"><button class="btn sm ma" data-act="mark-all" title="تعليم الكل كمقروء">${ico('checks')}<span class="t">تعليم الكل كمقروء</span></button><button class="btn sm ma-dd" data-act="mark-menu" title="خيارات التعليم">${ico('chev', 'dn')}</button></span>`;
+      h += `<div class="seg"><button data-act="lf" data-v="unread" class="${setting('listFilter') === 'unread' ? 'on' : ''}">غير المقروء${un ? ` <b>${fmtN(un)}</b>` : ''}</button><button data-act="lf" data-v="all" class="${setting('listFilter') === 'all' ? 'on' : ''}">الكل</button></div>`;
+    }
+    h2 += `<div class="seg" title="طريقة العرض"><button data-act="view-mode" data-v="list" class="${setting('view') !== 'cards' ? 'on' : ''}" title="قائمة">${ico('list')}</button><button data-act="view-mode" data-v="cards" class="${setting('view') === 'cards' ? 'on' : ''}" title="بطاقات">${ico('grid')}</button></div>`;
+    if (VIEW.type === 'feed') h2 += `<button class="ibtn" data-act="feed-menu" data-id="${esc(VIEW.id)}" title="خيارات المصدر">${ico('more')}</button>`;
+    if (VIEW.type === 'tag') h2 += `<button class="ibtn" data-act="tag-menu" data-id="${esc(VIEW.id)}" title="خيارات الوسم">${ico('more')}</button>`;
+    if (VIEW.type === 'rule') h2 += `<button class="ibtn" data-act="rule-edit" data-id="${esc(VIEW.id)}" title="تعديل الفلتر">${ico('pen')}</button>`;
   }
-  $('#list-h').innerHTML = h;
+  $('#list-h').innerHTML = h; $('#list-h2').innerHTML = h2;
+  $('.lh-s').classList.toggle('hidden', isDrafts); $('.lh-r').classList.toggle('hidden', isDrafts);
 }
 
 function renderList() {
+  const m = $('#main'), dash = VIEW.type === 'dash';
+  m.classList.toggle('dash-mode', dash);
+  if (dash) { m.classList.remove('cards-mode'); m.classList.add('pop'); return renderDash($('#dash')); }
   renderListHead();
   const box = $('#items');
   const cards = setting('view') === 'cards' && VIEW.type !== 'drafts';
-  box.classList.toggle('cards', cards); $('#main').classList.toggle('cards-mode', cards);
+  box.classList.toggle('cards', cards); m.classList.toggle('cards-mode', cards); m.classList.toggle('pop', cards);
   if (VIEW.type === 'drafts') return renderDraftList(box);
   const list = currentItems();
   if (!list.length) { box.innerHTML = emptyState(); return; }
@@ -1095,28 +1265,34 @@ function renderList() {
     const f = S.feeds[it.feedId] || { title: it.feedTitle || '' }; const s = st(it.id); const m = matchRules(it);
     const hl = m.find(r => r.action === 'highlight');
     const chips = m.filter(r => r.action === 'highlight').map(r => `<span class="chip" style="background:${esc(r.color)}22;color:${esc(r.color)}">${esc(r.name)}</span>`).join('');
-    const cards = setting('view') === 'cards';
     const th = it.image ? `<img class="it-th" src="${esc(it.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : '';
-    return `<div class="it${s.r ? '' : ' unread'}${it.id === SEL ? ' sel' : ''}${hl ? ' hl' : ''}" data-item="${esc(it.id)}"${hl ? ` style="--hl:${esc(hl.color)}"` : ''}>${cards ? th : ''}
+    const id = esc(it.id);
+    return `<div class="it${s.r ? '' : ' unread'}${it.id === SEL ? ' sel' : ''}${hl ? ' hl' : ''}" data-item="${id}"${hl ? ` style="--hl:${esc(hl.color)}"` : ''}>${cards ? th : ''}
       <div class="it-main">
-        <div class="it-meta"><span class="dot"></span><img src="${esc(favicon(f.siteUrl || f.url || it.link))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"><span class="src">${esc(f.title || hostOf(it.link))}</span>· <span>${timeAgo(it.date)}</span>
+        <div class="it-meta"><span class="dot"></span><img src="${esc(favicon(f.siteUrl || f.url || it.link))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"><span class="src">${esc(f.title || hostOf(it.link))}</span><span class="tm">· ${timeAgo(it.date)}</span>
           <span class="it-flags">${s.s ? ico('star', 'f-star') : ''}${s.l ? ico('clock', 'f-later') : ''}</span>${chips}</div>
         <div class="it-title">${esc(it.title)}</div>
-        ${it.text && setting('view') !== 'cards' ? `<div class="it-snip">${esc(it.text.slice(0, 180))}</div>` : ''}
+        ${it.text && !cards ? `<div class="it-snip">${esc(it.text.slice(0, 180))}</div>` : ''}
       </div>
-            ${cards ? '' : th}
+      ${cards ? '' : th}
+      <div class="it-acts"><span class="it-time">${timeAgo(it.date)}</span><span class="sp"></span>
+        <button class="ia" data-act="it-more" data-id="${id}" title="المزيد">${ico('more')}</button>
+        <button class="ia" data-act="it-read" data-id="${id}" title="${s.r ? 'تعليم كغير مقروء' : 'تعليم كمقروء'}">${ico(s.r ? 'unread' : 'rdot')}</button>
+        <button class="ia${s.l ? ' on' : ''}" data-act="it-later" data-id="${id}" title="${s.l ? 'إزالة من «للقراءة لاحقاً»' : 'حفظ للقراءة لاحقاً'}">${ico('clock')}</button>
+      </div>
     </div>`;
   }).join('');
   if (cards) watchThumbs(box);
 }
 
-function emptyState() {
-  if (!Object.keys(S.feeds).length && VIEW.type === 'all') {
+function welcomeHtml() {
     return `<div class="empty">${ico('rss')}<h3>أهلاً بك في ${esc(CONFIG.APP_NAME)}</h3>
       <div>أضف مواقعك المفضلة لتصلك أخبارها هنا. يقبل التطبيق خلاصات RSS، وحتى المواقع التي لا تملك RSS.</div>
       <div style="margin-top:16px"><button class="btn pri" data-act="add-feed">${ico('plus')}إضافة أول مصدر</button></div>
       <div class="sugg">${CONFIG.SUGGESTED.map(s => `<button class="btn sm" data-act="quick-add" data-url="${esc(s.url)}" data-title="${esc(s.title)}">+ ${esc(s.title)}</button>`).join('')}</div></div>`;
-  }
+}
+function emptyState() {
+  if (!Object.keys(S.feeds).length && VIEW.type === 'all') return welcomeHtml();
   if (QUERY) return `<div class="empty">${ico('search')}<h3>لا نتائج</h3><div>لا توجد مقالات تطابق «${esc(QUERY)}».</div></div>`;
   if (VIEW.type === 'starred') return `<div class="empty">${ico('star')}<h3>لا مقالات مميّزة</h3><div>اضغط النجمة على أي مقالة (أو <span class="kbd">s</span>) لحفظها هنا.</div></div>`;
   if (VIEW.type === 'later') return `<div class="empty">${ico('clock')}<h3>القائمة فارغة</h3><div>احفظ ما تريد قراءته لاحقاً بالزر ${ico('clock')} أو <span class="kbd">l</span>.</div></div>`;
@@ -1450,7 +1626,7 @@ $('#reader').addEventListener('scroll', () => {
   g.classList.toggle('done', p >= .98); $('b', g).textContent = p >= .98 ? '✓' : Math.round(p * 100);
 }, { passive: true });
 // النقر على الخلفية المعتمة يغلق النافذة المنبثقة
-$('#reader').addEventListener('mousedown', e => { if (e.target.id === 'reader' && $('#main').classList.contains('cards-mode')) closeReader(); });
+$('#reader').addEventListener('mousedown', e => { if (e.target.id === 'reader' && $('#main').classList.contains('pop')) closeReader(); });
 function closeReader() { SEL = null; $('#main').classList.remove('reading'); renderList(); renderReader(); }
 
 /* ---------- المسودات (إرسال الخبر إلى الكتابة) ---------- */
@@ -1521,12 +1697,13 @@ let _lastSig = '', _lastSel = null;
 function renderAll() { applyTheme(); renderSide(); renderList(); renderReader(true); }
 
 function setView(v, sel = null) {
-  VIEW = v; SEL = sel; $('#main').classList.toggle('reading', !!sel);
+  VIEW = v; SEL = sel; KEEP_VIS.clear(); if (v.type !== 'dash') DASH_CTX = [];
+  $('#main').classList.toggle('reading', !!sel);
   $('#side').classList.remove('open');
-  renderAll(); $('#items').scrollTop = 0;
+  renderAll(); $('#items').scrollTop = 0; $('#dash').scrollTop = 0;
 }
 function openItem(id) {
-  SEL = id; $('#main').classList.add('reading');
+  SEL = id; KEEP_VIS.add(id); $('#main').classList.add('reading');
   if (setting('autoRead') && !isRead(id)) setFlag(id, 'r', true);
   renderList(); renderReader();
   const el = $(`[data-item="${CSS.escape(id)}"]`); if (el) el.scrollIntoView({ block: 'nearest' });
@@ -1548,6 +1725,181 @@ async function loadFullText(id) {
     if (!res.html || plain(res.html).length < 150) throw new Error('لم يُعثر على نص المقالة في الصفحة');
     FULLTEXT.set(id, res); if (SEL === id) renderReader();
   } catch (e) { toast('تعذّر: ' + e.message, 3500); }
+}
+
+/* =========================================================
+   لوحة البداية (Dashboard): مربعات تعرض أهم ما في التطبيق في شاشة واحدة
+   ========================================================= */
+// المربعات: آخر الأخبار، قيد القراءة، مربع لكل فلتر، المسودات، حالة المصادر
+function dashKeys() {
+  const all = ['latest', 'later', ...Object.keys(S.rules || {}).map(id => 'rule:' + id), 'drafts', 'sources'];
+  const saved = ((setting('dash') || {}).order || []).filter(k => all.includes(k));
+  return [...saved, ...all.filter(k => !saved.includes(k))];
+}
+const dashOn = k => !(((setting('dash') || {}).off) || {})[k];
+function dashName(k) {
+  if (k.startsWith('rule:')) return 'فلتر: ' + ((S.rules[k.slice(5)] || {}).name || '');
+  return { latest: 'عاجل الآن', later: 'قيد القراءة', drafts: 'آخر المسودات', sources: 'حالة المصادر' }[k] || k;
+}
+function dashRow(it, snip, extra = '') {
+  const f = S.feeds[it.feedId] || { title: it.feedTitle || '' };
+  return `<div class="dw-i${isRead(it.id) ? '' : ' unread'}" data-item="${esc(it.id)}">
+    ${it.image ? `<img class="dw-th" src="${esc(it.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}
+    <div class="dw-m"><div class="dw-t">${esc(it.title)}</div>
+      <div class="dw-s"><img src="${esc(favicon(f.siteUrl || f.url || it.link))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"><span class="src">${esc(f.title || hostOf(it.link))}</span><span>· ${timeAgo(it.date)}</span></div>
+      ${snip && it.text ? `<div class="dw-x">${esc(it.text.slice(0, 170))}</div>` : ''}${extra}</div></div>`;
+}
+const dwBox = (k, icon, title, sub, body, extra = '', wide = false) => `<section class="dw${wide ? ' wide' : ''}" data-w="${esc(k)}">
+  <div class="dw-h">${icon}<h3>${title}</h3>${sub ? `<span class="dw-c">${sub}</span>` : ''}<span class="sp"></span>${extra}<button class="ibtn" data-act="dash-w" data-k="${esc(k)}" title="خيارات المربع">${ico('more')}</button></div>
+  <div class="dw-b">${body}</div></section>`;
+const allLink = (view, id) => `<button class="lnk" data-view="${view}"${id ? ` data-id="${esc(id)}"` : ''}>عرض الكل</button>`;
+const byDate = (a, b) => b.date - a.date;
+
+function dashWidget(k, UC) {
+  if (k === 'latest') {
+    const list = [...ITEMS.values()].filter(it => S.feeds[it.feedId] && !isHidden(it)).sort(byDate).slice(0, 8);
+    return dwBox(k, ico('inbox'), 'عاجل الآن', UC.total ? `${UC.total} غير مقروء` : '', list.length ? list.map(it => dashRow(it, true)).join('') : `<div class="dw-e">لا أخبار بعد. اضغط تحديث لجلب أحدث المقالات.</div>`, allLink('all'), true);
+  }
+  if (k === 'later') {
+    const all = Object.values(S.saved || {}).filter(it => st(it.id).l).map(it => ITEMS.get(it.id) || it);
+    const open = all.filter(it => progOf(it.id) < .98).sort((a, b) => (st(b.id).t || 0) - (st(a.id).t || 0));
+    const done = all.length - open.length;
+    const body = open.length ? open.slice(0, 6).map(it => { const p = progOf(it.id);
+      return dashRow(it, false, `<div class="dw-pg"><i><b style="width:${Math.round(p * 100)}%"></b></i><span>${p > .01 ? Math.round(p * 100) + '%' : 'لم تبدأ'}</span></div>`); }).join('')
+      : `<div class="dw-e">${all.length ? 'أكملت كل ما حفظته للقراءة لاحقاً.' : 'احفظ مقالة طويلة بزر الساعة لتقرأها لاحقاً، وستظهر هنا مع نسبة ما قرأت منها.'}</div>`;
+    return dwBox(k, ico('clock'), 'قيد القراءة', all.length ? `${open.length} قيد القراءة${done ? ` · ${done} مكتملة` : ''}` : '', body, all.length ? allLink('later') : '');
+  }
+  if (k.startsWith('rule:')) {
+    const rid = k.slice(5), r = S.rules[rid]; if (!r) return '';
+    const pr = prepRule(rid, r);
+    const list = pr.kw.length ? [...ITEMS.values()].filter(it => S.feeds[it.feedId] && ruleHit(pr, it)).sort(byDate) : [];
+    const un = list.filter(it => !isRead(it.id)).length;
+    return dwBox(k, `<span class="dw-sw" style="background:${esc(r.color || '#999')}"></span>`, esc(r.name), `${list.length} مطابقة${un ? ` · ${un} غير مقروءة` : ''}${r.enabled === false ? ' <span class="dw-off">معطّل</span>' : ''}`,
+      list.length ? list.slice(0, 6).map(it => dashRow(it)).join('') : `<div class="dw-e">لا مقالات تذكر: ${esc((r.keywords || []).join('، ') || '—')}</div>`, allLink('rule', rid));
+  }
+  if (k === 'drafts') {
+    const list = draftsSorted().slice(0, 5);
+    const body = list.length ? list.map(([id, d]) => `<div class="dw-i" data-act="open-draft" data-id="${esc(id)}"><div class="dw-m">
+        <div class="dw-t" style="color:var(--tx);font-weight:600">${esc(d.title || 'بلا عنوان')}</div>
+        <div class="dw-s">${ico('pen')}<span>${timeAgo(d.updatedAt || d.createdAt)}</span>${d.sourceUrl ? `<span class="src">· ${esc(d.feedTitle || hostOf(d.sourceUrl))}</span>` : ''}</div>
+        ${d.body ? `<div class="dw-x">${esc(d.body.slice(0, 150))}</div>` : ''}</div></div>`).join('')
+      : `<div class="dw-e">لا مسودات. اكتب ملاحظة جديدة، أو حوّل أي خبر إلى مسودة بزر ${ico('pen')} في شريط المقالة.</div>`;
+    return dwBox(k, ico('pen'), 'آخر المسودات', Object.keys(S.drafts || {}).length ? `${Object.keys(S.drafts).length} مسودة` : '', body, `<button class="lnk" data-act="new-draft">+ مسودة جديدة</button>`);
+  }
+  if (k === 'sources') {
+    const feeds = Object.entries(S.feeds).map(([id, f]) => ({ id, f, n: UC.feed[id] || 0, err: FEED_STATUS[id] && FEED_STATUS[id].error }))
+      .sort((a, b) => (!!b.err - !!a.err) || (b.n - a.n) || (a.f.title || '').localeCompare(b.f.title || '', 'ar'));
+    const errs = feeds.filter(x => x.err).length, last = lsGet('s24r_last_refresh', 0);
+    const body = feeds.slice(0, 10).map(({ id, f, n, err }) => `<div class="dw-f" data-view="feed" data-id="${esc(id)}" title="${esc(err || f.url)}">
+        <img src="${esc(favicon(f.siteUrl || f.url))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
+        <span class="lbl">${esc(f.title || hostOf(f.url))}</span>${err ? '<span class="bad">متوقف</span>' : ''}<span class="cnt">${n || ''}</span></div>`).join('')
+      + `<div class="dw-foot"><span>${feeds.length} مصدر${errs ? ` · <b style="color:var(--danger)">${errs} متوقف</b>` : ''}</span><span class="sp" style="flex:1"></span><span>${last ? 'آخر تحديث ' + timeAgo(last) : ''}</span></div>`;
+    return dwBox(k, ico('rss'), 'حالة المصادر', '', body, `<button class="lnk" data-act="rail" data-k="feeds">كل المصادر</button>`);
+  }
+  return '';
+}
+
+function renderDash(box) {
+  if (!Object.keys(S.feeds).length) { box.innerHTML = `<div class="dash-in">${welcomeHtml()}</div>`; return; }
+  const UC = unreadCounts();
+  const name = USER ? ((USER.displayName || '').trim().split(/\s+/)[0] || (USER.email || '').split('@')[0]) : '';
+  const greet = new Date().getHours() < 12 ? 'صباح الخير' : 'مساء الخير';
+  const nd = Object.keys(S.drafts || {}).length, nf = Object.keys(S.feeds).length;
+  const keys = dashKeys().filter(dashOn);
+  const keep = box.scrollTop;
+  box.innerHTML = `<div class="dash-in"><div class="dash-h">
+      <div><h1>${greet}${name ? '، ' + esc(name) : ''}</h1><div class="dash-d">${new Date().toLocaleDateString('ar', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div></div>
+      <span class="sp"></span>
+      <div class="dash-st"><button data-view="all"><b>${UC.total}</b>غير مقروء</button><button data-view="later"><b>${countSaved('l')}</b>للقراءة لاحقاً</button><button data-act="rail" data-k="drafts"><b>${nd}</b>مسودة</button><button data-act="rail" data-k="feeds"><b>${nf}</b>مصدر</button></div>
+      <button class="ibtn" data-act="refresh" title="تحديث (r)"><svg class="ico refresh-ico${REFRESHING ? ' spin' : ''}"><use href="#i-refresh"/></svg></button>
+      <button class="btn sm" data-act="dash-custom">${ico('sliders')}تخصيص</button></div>
+    ${keys.length ? `<div class="dash-g">${keys.map(k => dashWidget(k, UC)).join('')}</div>` : `<div class="empty">${ico('home')}<h3>لا مربعات ظاهرة</h3><div>أعد إظهار المربعات من زر «تخصيص».</div></div>`}</div>`;
+  box.scrollTop = keep;
+}
+
+function saveDash(order, off) { Store.write('settings/dash', { order, off }); renderList(); }
+async function dashWMenu(anchor, k) {
+  const c = await popMenu(anchor, [{ k: 'up', icon: 'up', label: 'نقل إلى الأمام' }, { k: 'down', icon: 'down', label: 'نقل إلى الخلف' }, '-', { k: 'hide', icon: 'x', label: 'إخفاء المربع' }]);
+  if (!c) return;
+  const order = dashKeys(), off = { ...((setting('dash') || {}).off || {}) };
+  if (c === 'hide') { off[k] = 1; toast('أُخفي المربع. تعيده من زر «تخصيص».'); return saveDash(order, off); }
+  const i = order.indexOf(k), step = c === 'up' ? -1 : 1; let j = i + step;
+  while (j >= 0 && j < order.length && off[order[j]]) j += step;
+  if (j < 0 || j >= order.length) return;
+  [order[i], order[j]] = [order[j], order[i]]; saveDash(order, off);
+}
+function dashCustom() {
+  modal('تخصيص لوحة البداية', `<p style="margin:0 0 12px;color:var(--tx2);font-size:14px">اختر المربعات التي تظهر في لوحة البداية، ورتّبها بالسهمين. يظهر لكل فلتر تنشئه مربع خاص به.</p>
+    <div id="dc-l">${dashKeys().map(k => `<div class="dc-row" data-k="${esc(k)}"><span class="rb">${esc(dashName(k))}</span>
+      <button class="ibtn" data-act="dc-move" data-d="-1" title="لأعلى">${ico('up')}</button><button class="ibtn" data-act="dc-move" data-d="1" title="لأسفل">${ico('down')}</button>
+      <label class="toggle" title="إظهار"><input type="checkbox"${dashOn(k) ? ' checked' : ''}><span></span></label></div>`).join('')}</div>`,
+    `<button class="btn pri" data-act="dc-save">حفظ</button><button class="btn" data-act="close-modal">إلغاء</button>`);
+}
+function dashCustomSave() {
+  const rows = $$('#dc-l .dc-row'), off = {};
+  rows.forEach(r => { if (!$('input', r).checked) off[r.dataset.k] = 1; });
+  closeModal(); saveDash(rows.map(r => r.dataset.k), off);
+}
+
+/* ---------- قوائم صغيرة: المقالة في القائمة، التعليم، الحساب، المصادر المتوقفة ---------- */
+// تعليم مجموعة مقالات كمقروءة مع إمكانية التراجع
+function markRead(list, label) {
+  const upd = {}, prev = {}; const now = Date.now();
+  list.forEach(it => { if (!isRead(it.id)) { const k = 'states/' + it.id; prev[k] = S.states[it.id] ? { ...S.states[it.id] } : null; upd[k] = { ...st(it.id), r: 1, t: now }; } });
+  const n = Object.keys(upd).length; if (!n) return toast('لا توجد مقالات غير مقروءة هنا');
+  Store.update(upd); scheduleRender();
+  toastUndo(`عُلِّمت ${n} مقالة كمقروءة${label || ''}`, () => { Store.update(prev); scheduleRender(); });
+}
+async function markMenu(anchor) {
+  const c = await popMenu(anchor, [{ k: '0', icon: 'checks', label: 'كل مقالات هذه الصفحة' }, '-', { k: '86400000', icon: 'clock', label: 'الأقدم من يوم' }, { k: '259200000', icon: 'clock', label: 'الأقدم من 3 أيام' }, { k: '604800000', icon: 'clock', label: 'الأقدم من أسبوع' }]);
+  if (c != null) markAllRead(Number(c));
+}
+async function itemMenu(anchor, id) {
+  const it = getItem(id); if (!it) return; const s = st(id);
+  const c = await popMenu(anchor, [
+    { k: 'star', icon: 'star', label: s.s ? 'إزالة النجمة' : 'تمييز بنجمة' },
+    { k: 'older', icon: 'checks', label: 'تعليم الأقدم منها كمقروء' },
+    '-',
+    { k: 'draft', icon: 'pen', label: 'إرسال إلى الكتابة' },
+    { k: 'open', icon: 'ext', label: 'فتح الموقع الأصلي' },
+    { k: 'copy', icon: 'copy', label: 'نسخ الرابط' },
+  ]);
+  if (c === 'star') toggleFlag(id, 's');
+  else if (c === 'older') markRead(currentItems().filter(x => x.date < it.date), ' (الأقدم منها)');
+  else if (c === 'draft') itemToDraft(it);
+  else if (c === 'open') window.open(it.link, '_blank', 'noopener');
+  else if (c === 'copy') navigator.clipboard.writeText(it.link).then(() => toast('نُسخ الرابط'));
+}
+async function meMenu(anchor) {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  const c = await popMenu(anchor, [
+    { k: 'settings', icon: 'user', label: USER ? esc(USER.email || USER.displayName || 'حسابي') : 'وضع محلي (بلا حساب)' },
+    '-',
+    { k: 'settings', icon: 'gear', label: 'الإعدادات' },
+    { k: 'theme', icon: dark ? 'sun' : 'moon', label: dark ? 'الوضع النهاري' : 'الوضع الليلي' },
+    ...(USER ? ['-', { k: 'logout', icon: 'ext', label: 'تسجيل الخروج', danger: true }] : []),
+  ]);
+  if (c === 'settings') openSettings();
+  else if (c === 'theme') toggleTheme();
+  else if (c === 'logout') logout();
+}
+async function feedErrMenu(anchor) {
+  const errs = Object.entries(S.feeds).filter(([id]) => FEED_STATUS[id] && FEED_STATUS[id].error);
+  const c = await popMenu(anchor, errs.map(([id, f]) => ({ k: id, icon: 'alert', label: `${esc(f.title || hostOf(f.url))} <small style="color:var(--tx3)">— ${esc(FEED_STATUS[id].error)}</small>` })));
+  if (c) setView({ type: 'feed', id: c });
+}
+function toggleTheme() { Store.write('settings/theme', document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); applyTheme(); renderSide(); }
+async function logout() { if (confirm('تسجيل الخروج من حسابك؟')) { await firebase.auth().signOut(); location.reload(); } }
+// أيقونات الشريط: الانتقال بين الأقسام (وعلى الجوال تفتح اللوحة الجانبية)
+function railGo(k) {
+  const mob = innerWidth <= 760, side = $('#side');
+  if (k === 'dash' || k === 'drafts') return setView({ type: k });
+  if (k === 'add') return openAddFeed();
+  if (k === 'search') { if (VIEW.type === 'dash' || VIEW.type === 'drafts') setView({ type: 'all' }); return $('#q').focus(); }
+  const cur = railKind();
+  if (cur !== k) setView(k === 'saved' ? { type: 'later' } : { type: 'all' });
+  else if (!mob && PANEL_OFF) togglePanel();
+  if (mob) side.classList.toggle('open', cur !== k || !side.classList.contains('open'));
 }
 
 /* =========================================================
@@ -1778,6 +2130,8 @@ function openSettings() {
     <div class="row">
       <div class="fld"><label>الترتيب</label><select class="in" id="se-sort"><option value="new">الأحدث أولاً</option><option value="old">الأقدم أولاً</option></select></div>
       <div class="fld"><label>عند فتح المقالة</label><select class="in" id="se-auto"><option value="1">تُعلَّم كمقروءة</option><option value="0">تبقى غير مقروءة</option></select></div></div>
+    <div class="row">
+      <div class="fld"><label>صفحة البداية</label><select class="in" id="se-start"><option value="dash">لوحة البداية</option><option value="all">كل المقالات</option></select></div><div class="fld"></div></div>
     <div class="box"><h5>استيراد وتصدير</h5><div style="font-size:13px;color:var(--tx3);margin-bottom:8px">OPML هي الصيغة المعيارية لنقل الاشتراكات من Inoreader وFeedly وغيرها.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-act="opml-import">${ico('plus')}استيراد OPML</button><button class="btn sm" data-act="opml-export">${ico('ext')}تصدير OPML</button><button class="btn sm" data-act="json-export">${ico('doc')}نسخة احتياطية كاملة</button></div>
       <input type="file" id="opml-file" accept=".opml,.xml,text/xml" hidden></div>
@@ -1786,12 +2140,12 @@ function openSettings() {
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">${USER ? `<button class="btn sm" data-act="logout">تسجيل الخروج</button>` : ''}<button class="btn sm danger" data-act="clear-cache">مسح المقالات المخزّنة</button></div></div>`,
     `<button class="btn pri" data-act="se-save">حفظ</button><button class="btn" data-act="close-modal">إغلاق</button>`, 'lg');
   $('#se-theme').value = setting('theme'); $('#se-ref').value = String(setting('refreshMin'));
-  $('#se-sort').value = setting('sort'); $('#se-auto').value = setting('autoRead') ? '1' : '0';
+  $('#se-sort').value = setting('sort'); $('#se-auto').value = setting('autoRead') ? '1' : '0'; $('#se-start').value = setting('start');
   $('#opml-file').addEventListener('change', e => importOpml(e.target.files[0]));
 }
 function saveSettings() {
   const w = $('#se-worker'); if (w) lsSet('s24r_worker', w.value.trim());
-  Store.write('settings', { ...S.settings, theme: $('#se-theme').value, refreshMin: Number($('#se-ref').value), sort: $('#se-sort').value, autoRead: $('#se-auto').value === '1' });
+  Store.write('settings', { ...S.settings, theme: $('#se-theme').value, refreshMin: Number($('#se-ref').value), sort: $('#se-sort').value, autoRead: $('#se-auto').value === '1', start: $('#se-start').value });
   closeModal(); setupTimer(); renderAll(); hideBannerIfOk(); toast('حُفظت الإعدادات');
   if (w && w.value.trim()) refreshAll();
 }
@@ -1999,6 +2353,8 @@ function endFeedDrag(e) {
    الأحداث
    ========================================================= */
 document.addEventListener('click', async e => {
+  // الجوال: النقر خارج اللوحة الجانبية يغلقها
+  if (innerWidth <= 760 && $('#side').classList.contains('open') && !e.target.closest('#side,#rail')) $('#side').classList.remove('open');
   const t = e.target.closest('[data-act],[data-view],[data-item],[data-draft]'); if (!t) return;
   const act = t.dataset.act, id = t.dataset.id;
   if (act) {
@@ -2013,7 +2369,21 @@ document.addEventListener('click', async e => {
       case 'af-check': checkFeedUrl(); break;
       case 'af-save': saveNewFeed(); break;
       case 'settings': openSettings(); break;
-      case 'theme': Store.write('settings/theme', document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); applyTheme(); break;
+      case 'theme': toggleTheme(); break;
+      case 'rail': railGo(t.dataset.k); break;
+      case 'toggle-panel': togglePanel(); break;
+      case 'me-menu': meMenu(t); break;
+      case 'feed-errors': feedErrMenu(t); break;
+      case 'tag-new': { const n = prompt('اسم الوسم الجديد'); const tid = n && createTag(n); if (tid) setView({ type: 'tag', id: tid }); break; }
+      case 'it-read': KEEP_VIS.add(id); toggleFlag(id, 'r'); break;
+      case 'it-later': toggleFlag(id, 'l'); break;
+      case 'it-more': itemMenu(t, id); break;
+      case 'mark-menu': markMenu(t); break;
+      case 'open-draft': setView({ type: 'drafts' }, id); break;
+      case 'dash-w': dashWMenu(t, t.dataset.k); break;
+      case 'dash-custom': dashCustom(); break;
+      case 'dc-move': { const row = t.closest('.dc-row'), sib = Number(t.dataset.d) < 0 ? row.previousElementSibling : row.nextElementSibling; if (sib) Number(t.dataset.d) < 0 ? row.after(sib) : sib.after(row); break; }
+      case 'dc-save': dashCustomSave(); break;
       case 'se-save': saveSettings(); break;
       case 'close-modal': closeModal(); break;
       case 'new-folder': newFolder(); break;
@@ -2026,7 +2396,7 @@ document.addEventListener('click', async e => {
         Store.update({ [`feeds/${fid}/title`]: $('#ef-name').value.trim() || S.feeds[fid].title, [`feeds/${fid}/url`]: url || S.feeds[fid].url, [`feeds/${fid}/folder`]: $('#ef-folder').value });
         closeModal(); renderAll(); if (url) refreshFeed(fid); break;
       }
-      case 'lf': Store.write('settings/listFilter', t.dataset.v); renderList(); break;
+      case 'lf': KEEP_VIS.clear(); Store.write('settings/listFilter', t.dataset.v); renderList(); break;
       case 'view-mode': Store.write('settings/view', t.dataset.v); renderAll(); break;
       case 'mark-all': markAllRead(); break;
       case 'star': if (it) toggleFlag(it.id, 's'); break;
@@ -2061,7 +2431,7 @@ document.addEventListener('click', async e => {
       case 'opml-export': exportOpml(); break;
       case 'json-export': download('s24nreader-backup.json', JSON.stringify({ ...S, states: undefined }, null, 2), 'application/json'); break;
       case 'clear-cache': if (confirm('مسح المقالات المخزّنة مؤقتاً؟ (لن تُحذف مصادرك أو المحفوظات)')) { IDB.clear(); ITEMS.clear(); closeModal(); renderAll(); refreshAll(); } break;
-      case 'logout': if (confirm('تسجيل الخروج من حسابك؟')) { await firebase.auth().signOut(); location.reload(); } break;
+      case 'logout': logout(); break;
       case 'google': authAction('google'); break;
       case 'au-in': authAction('in'); break;  // احتياطي، الإرسال يتم عبر النموذج
       case 'au-up': authAction('up'); break;
@@ -2071,7 +2441,10 @@ document.addEventListener('click', async e => {
     return;
   }
   if (t.dataset.view) { const v = { type: t.dataset.view }; if (t.dataset.id) v.id = t.dataset.id; setView(v); return; }
-  if (t.dataset.item) { openItem(t.dataset.item); return; }
+  if (t.dataset.item) {
+    if (VIEW.type === 'dash') { const w = t.closest('.dw'); DASH_CTX = w ? $$('[data-item]', w).map(e => e.dataset.item) : [t.dataset.item]; }
+    openItem(t.dataset.item); return;
+  }
   if (t.dataset.draft) { SEL = t.dataset.draft; $('#main').classList.add('reading'); renderList(); renderReader(); }
 });
 document.addEventListener('submit', e => {
@@ -2097,7 +2470,7 @@ document.addEventListener('keydown', e => {
     case 't': if (it) { const b = $('[data-act="tags-pop"]'); if (b) { e.preventDefault(); tagsPop(b); } } break;
     case 'r': refreshAll(); break;
     case 'z': if (UNDO) UNDO(); break;
-    case '/': e.preventDefault(); $('#q').focus(); break;
+    case '/': e.preventDefault(); railGo('search'); break;
     case 'Escape': if (document.querySelector('.tagpop,.menu')) { document.querySelectorAll('.tagpop,.menu').forEach(m => m.remove()); break; } if (SEL) closeReader(); break;
   }
 });
@@ -2131,6 +2504,7 @@ async function start() {
     (c.items || []).forEach(it => ITEMS.set(it.id, it));
   }
   $('#auth').classList.add('hidden');
+  VIEW = { type: setting('start') === 'all' ? 'all' : 'dash' }; SEL = null;
   renderAll(); showBanner(); setupTimer(); pruneStates();
   refreshAll();
 }
