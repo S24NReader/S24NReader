@@ -79,7 +79,7 @@ body.col-resizing iframe,body.col-resizing .reader{pointer-events:none}
 .drop-line{position:fixed;z-index:999;height:2px;background:var(--ac);pointer-events:none;border-radius:2px}
 .drop-line::before{content:'';position:absolute;right:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--ac)}
 .nav-i.drop-in{outline:2px solid var(--ac);outline-offset:-2px;background:var(--ac2)}
-.nav-i.dragging-src{opacity:.35}
+.nav-i.dragging-src,.folder.dragging-src{opacity:.35}
 body.feed-dragging{cursor:grabbing;user-select:none}
 body.feed-dragging .nav-i:hover{background:none}
 /* ---------- الشريط الجانبي ---------- */
@@ -1033,7 +1033,7 @@ let _mr = { v: '', m: new Map() };
 const prepRule = (id, r) => ({ id, ...r, kw: (r.keywords || []).map(normAr).filter(Boolean) });
 function activeRules() {
   // النسخة تشمل مجلدات المصادر لأن نطاق القاعدة قد يكون مجلداً
-  const v = JSON.stringify(S.rules || {}) + '|' + Object.entries(S.feeds).map(([k, f]) => k + ':' + (f.folder || '')).join(',');
+  const v = JSON.stringify(S.rules || {}) + '|' + Object.entries(S.feeds).map(([k, f]) => k + ':' + (f.folder || '')).join(',') + '|' + Object.entries(S.folders || {}).map(([k, f]) => k + '<' + (f.parent || '')).join(',');
   if (_rulesCache.v !== v) {
     _rulesCache = { v, list: Object.entries(S.rules || {}).filter(([, r]) => r.enabled !== false && (r.keywords || []).length).map(([id, r]) => prepRule(id, r)) };
   }
@@ -1042,7 +1042,7 @@ function activeRules() {
 function inScope(rule, item) {
   const sc = rule.scope || 'all'; if (sc === 'all') return true;
   if (sc.startsWith('feed:')) return item.feedId === sc.slice(5);
-  if (sc.startsWith('folder:')) { const f = S.feeds[item.feedId]; return f && f.folder === sc.slice(7); }
+  if (sc.startsWith('folder:')) { const f = S.feeds[item.feedId]; return f && inFolder(f.folder, sc.slice(7)); }
   return true;
 }
 function ruleHit(r, item) {
@@ -1106,6 +1106,12 @@ function pruneStates() { // حذف حالات المقالات القديمة ا
 /* =========================================================
    العرض
    ========================================================= */
+// المجلدات بمستويين: مجلد رئيسي وبداخله مجلدات فرعية (الحقل parent)، والفرعي لا يضم مجلدات
+function parentOf(fid) { const fo = S.folders && S.folders[fid], p = fo && fo.parent; return p && p !== fid && S.folders[p] && !S.folders[p].parent ? p : ''; }
+function inFolder(fo, id) { return !!fo && (fo === id || parentOf(fo) === id); }
+function folderPath(fid) { const p = parentOf(fid), n = (S.folders[fid] || {}).name || ''; return p ? S.folders[p].name + ' / ' + n : n; }
+function folderTree() { return foldersSorted('').flatMap(e => [e, ...foldersSorted(e[0])]); }
+function foldersSorted(parent = '') { return Object.entries(S.folders || {}).filter(([id]) => parentOf(id) === parent).sort((a, b) => (a[1].order || 0) - (b[1].order || 0) || (a[1].name || '').localeCompare(b[1].name || '', 'ar')); }
 function feedsInFolder(fid) { const O = f => f.order == null ? 1e15 : f.order; return Object.entries(S.feeds).filter(([, f]) => (f.folder || '') === fid).sort((a, b) => O(a[1]) - O(b[1]) || (a[1].title || '').localeCompare(b[1].title || '', 'ar')); }
 // عدّاد غير المقروء: مرور واحد على كل المقالات لكل رسم
 function unreadCounts() {
@@ -1115,7 +1121,7 @@ function unreadCounts() {
     const m = matchRules(it); m.forEach(r => rule[r.id] = (rule[r.id] || 0) + 1);
     if (m.some(r => r.action === 'hide')) continue;
     feed[it.feedId] = (feed[it.feedId] || 0) + 1; total++;
-    if (f.folder) folder[f.folder] = (folder[f.folder] || 0) + 1;
+    if (f.folder) { folder[f.folder] = (folder[f.folder] || 0) + 1; const p = parentOf(f.folder); if (p) folder[p] = (folder[p] || 0) + 1; }
   }
   return { feed, folder, rule, total };
 }
@@ -1131,7 +1137,7 @@ function currentItems(opts = {}) {
   } else {
     list = [...ITEMS.values()].filter(it => S.feeds[it.feedId]);
     if (VIEW.type === 'feed') list = list.filter(it => it.feedId === VIEW.id);
-    if (VIEW.type === 'folder') list = list.filter(it => (S.feeds[it.feedId].folder || '') === VIEW.id);
+    if (VIEW.type === 'folder') list = list.filter(it => inFolder(S.feeds[it.feedId].folder, VIEW.id));
     if (VIEW.type === 'rule') {
       // صفحة الفلتر: كل المقالات المطابقة للقاعدة (حتى لو كانت قاعدة إخفاء أو معطّلة)
       const r = S.rules[VIEW.id]; const pr = r ? prepRule(VIEW.id, r) : null;
@@ -1150,7 +1156,7 @@ function viewTitle() {
   if (VIEW.type === 'starred') return 'المميّزة بنجمة';
   if (VIEW.type === 'later') return 'للقراءة لاحقاً';
   if (VIEW.type === 'drafts') return 'المسودات';
-  if (VIEW.type === 'folder') return (S.folders[VIEW.id] || {}).name || 'مجلد';
+  if (VIEW.type === 'folder') return S.folders[VIEW.id] ? folderPath(VIEW.id) : 'مجلد';
   if (VIEW.type === 'feed') return (S.feeds[VIEW.id] || {}).title || 'مصدر';
   if (VIEW.type === 'rule') return 'فلتر: ' + ((S.rules[VIEW.id] || {}).name || '');
   if (VIEW.type === 'tag') return 'وسم: ' + ((S.tags[VIEW.id] || {}).name || '');
@@ -1214,16 +1220,16 @@ function renderSide(force) {
     const errs = Object.keys(S.feeds).filter(id => FEED_STATUS[id] && FEED_STATUS[id].error).length;
     if (errs) h += `<button class="p-alert" data-act="feed-errors">${ico('alert')}<span>${errs === 1 ? 'مصدر واحد لا يُحدَّث' : errs + ' مصادر لا تُحدَّث'} — اضغط للتفاصيل</span></button>`;
     h += nav('all', 'inbox', 'كل المقالات', total);
-    const folders = Object.entries(S.folders || {}).sort((a, b) => (a[1].order || 0) - (b[1].order || 0) || a[1].name.localeCompare(b[1].name, 'ar'));
-    for (const [fid, fo] of folders) {
-      const n = UC.folder[fid] || 0;
-      h += `<div class="folder${collapsed.has(fid) ? ' collapsed' : ''}">
-        <div class="nav-i${act('folder', fid)}${n ? ' has-unread' : ''}" data-view="folder" data-id="${esc(fid)}">
+    const folderBlock = ([fid, fo]) => {
+      const n = UC.folder[fid] || 0, subs = foldersSorted(fid), feeds = feedsInFolder(fid).map(feedRow).join('');
+      return `<div class="folder${collapsed.has(fid) ? ' collapsed' : ''}" data-fid="${esc(fid)}">
+        <div class="nav-i${act('folder', fid)}${n ? ' has-unread' : ''}" data-view="folder" data-id="${esc(fid)}" data-drag="folder">
           <span data-act="toggle-folder" data-id="${esc(fid)}" style="display:grid">${ico('chev', 'chev')}</span><span class="fico" style="${fo.color ? `color:${esc(fo.color)}` : ''}">${ico('folder')}</span>
           <span class="lbl">${esc(fo.name)}</span><span class="cnt">${n || ''}</span>
           <button class="more" data-act="folder-menu" data-id="${esc(fid)}">${ico('more')}</button></div>
-        <div class="kids">${feedsInFolder(fid).map(feedRow).join('') || '<div class="side-foot">لا مصادر</div>'}</div></div>`;
-    }
+        <div class="kids">${subs.map(folderBlock).join('')}${feeds || (subs.length ? '' : '<div class="side-foot">لا مصادر</div>')}</div></div>`;
+    };
+    h += foldersSorted('').map(folderBlock).join('');
     h += feedsInFolder('').map(feedRow).join('');
     if (!Object.keys(S.feeds).length) h += `<div class="side-foot">لم تُضف أي مصدر بعد.</div>`;
     h += `<h4>الفلاتر <span><button data-act="rules" title="إدارة القواعد">${ico('gear')}</button> <button data-act="rule-new" title="فلتر جديد">${ico('plus')}</button></span></h4>`;
@@ -1922,7 +1928,7 @@ function modal(title, body, foot = '', cls = '') {
   return ov;
 }
 function closeModal() { const o = $('#ov'); if (o) o.remove(); }
-const folderOptions = sel => `<option value="">— بلا مجلد —</option>` + Object.entries(S.folders || {}).map(([id, f]) => `<option value="${esc(id)}"${id === sel ? ' selected' : ''}>${esc(f.name)}</option>`).join('');
+const folderOptions = sel => `<option value="">— بلا مجلد —</option>` + folderTree().map(([id]) => `<option value="${esc(id)}"${id === sel ? ' selected' : ''}>${esc(folderPath(id))}</option>`).join('');
 
 /* ---------- إضافة مصدر ---------- */
 function openAddFeed(prefill = '') {
@@ -2029,24 +2035,31 @@ function editFeed(id) {
   ov.dataset.id = id;
 }
 async function folderMenu(anchor, id) {
-  const k = await popMenu(anchor, [{ k: 'rename', icon: 'pen', label: 'تعديل الاسم واللون' }, { k: 'read', icon: 'checks', label: 'تعليم الكل كمقروء' }, { k: 'rule', icon: 'filter', label: 'قاعدة لهذا المجلد' }, '-', { k: 'del', icon: 'trash', label: 'حذف المجلد', danger: true }]);
+  const k = await popMenu(anchor, [{ k: 'rename', icon: 'pen', label: 'تعديل المجلد ومكانه' }, ...(parentOf(id) ? [] : [{ k: 'sub', icon: 'folder', label: 'مجلد فرعي جديد' }]), { k: 'read', icon: 'checks', label: 'تعليم الكل كمقروء' }, { k: 'rule', icon: 'filter', label: 'قاعدة لهذا المجلد' }, '-', { k: 'del', icon: 'trash', label: 'حذف المجلد', danger: true }]);
   const fo = S.folders[id]; if (!fo) return;
   if (k === 'rename') folderModal(id);
+  if (k === 'sub') folderModal(null, null, id);
   if (k === 'read') { const prev = VIEW; VIEW = { type: 'folder', id }; markAllRead(); VIEW = prev; }
   if (k === 'rule') editRule(null, { scope: 'folder:' + id });
   if (k === 'del') {
-    const feeds = feedsInFolder(id);
-    if (!confirm(feeds.length ? `حذف المجلد «${fo.name}»؟ ستُنقل مصادره (${feeds.length}) إلى خارج المجلدات.` : `حذف المجلد «${fo.name}»؟`)) return;
+    const feeds = feedsInFolder(id), subs = foldersSorted(id);
+    const notes = [feeds.length ? `ستُنقل مصادره المباشرة (${feeds.length}) إلى خارج المجلدات.` : '', subs.length ? `وتصير مجلداته الفرعية (${subs.length}) مجلدات رئيسية بمصادرها.` : ''].filter(Boolean).join(' ');
+    if (!confirm(`حذف المجلد «${fo.name}»؟` + (notes ? ' ' + notes : ''))) return;
     const upd = { ['folders/' + id]: null }; feeds.forEach(([fid]) => upd[`feeds/${fid}/folder`] = '');
+    subs.forEach(([sid]) => { upd[`folders/${sid}/parent`] = ''; upd[`folders/${sid}/order`] = Date.now(); });
     Store.update(upd); if (VIEW.type === 'folder' && VIEW.id === id) setView({ type: 'all' }); else renderAll();
   }
 }
 function newFolder() { folderModal(null); }
 // نافذة إنشاء/تعديل مجلد: الاسم + اللون (منتقي ألوان غير محدود)
-function folderModal(id, onCreated) {
-  const fo = id ? S.folders[id] : { name: '', color: '' };
+function folderModal(id, onCreated, parent = '') {
+  const fo = id ? S.folders[id] : { name: '', color: '' }, cur = id ? parentOf(id) : parent;
+  const hasSubs = id && foldersSorted(id).length;
+  const where = hasSubs ? `<div class="hint">هذا المجلد يضم مجلدات فرعية، لذلك يبقى مجلداً رئيسياً.</div>`
+    : `<select class="in" id="fo-parent"><option value="">— مجلد رئيسي —</option>${foldersSorted('').filter(([f]) => f !== id).map(([f, o]) => `<option value="${esc(f)}"${f === cur ? ' selected' : ''}>داخل: ${esc(o.name)}</option>`).join('')}</select>`;
   const ov = modal(id ? 'تعديل المجلد' : 'مجلد جديد', `
     <div class="fld"><label>اسم المجلد</label><input class="in" id="fo-name" value="${esc(fo.name)}" placeholder="مثال: أخبار سورية"></div>
+    <div class="fld"><label>المكان</label>${where}</div>
     <div class="fld"><label>اللون</label>${colorField('fo-color', fo.color || '#6c757d')}<div class="hint">يظهر لون أيقونة المجلد في الشريط الجانبي.</div></div>`,
     `<button class="btn pri" data-act="fo-save">${id ? 'حفظ' : 'إنشاء'}</button><button class="btn" data-act="close-modal">إلغاء</button>`);
   ov.dataset.id = id || ''; FO_CB = onCreated || null;
@@ -2056,8 +2069,13 @@ let FO_CB = null;
 function saveFolder() {
   const name = $('#fo-name').value.trim(); if (!name) return toast('اكتب اسم المجلد');
   const id = $('#ov').dataset.id; const color = $('#fo-color').value;
-  if (id) Store.update({ [`folders/${id}/name`]: name, [`folders/${id}/color`]: color });
-  else { const nid = uid(); Store.write('folders/' + nid, { name, color, order: Date.now() }); if (FO_CB) { const cb = FO_CB; FO_CB = null; return cb(nid); } }
+  const pe = $('#fo-parent'), parent = pe ? pe.value : null;
+  if (id) {
+    const upd = { [`folders/${id}/name`]: name, [`folders/${id}/color`]: color };
+    if (parent !== null && parent !== parentOf(id)) { upd[`folders/${id}/parent`] = parent; upd[`folders/${id}/order`] = Date.now(); }
+    Store.update(upd);
+  }
+  else { const nid = uid(); Store.write('folders/' + nid, { name, color, order: Date.now(), parent: parent || '' }); if (parent) { collapsed.delete(parent); lsSet('s24r_collapsed', [...collapsed]); } if (FO_CB) { const cb = FO_CB; FO_CB = null; return cb(nid); } }
   closeModal(); renderAll();
 }
 
@@ -2065,7 +2083,7 @@ function saveFolder() {
 function scopeLabel(sc) {
   if (!sc || sc === 'all') return 'كل المصادر';
   if (sc.startsWith('feed:')) return 'المصدر: ' + ((S.feeds[sc.slice(5)] || {}).title || '؟');
-  if (sc.startsWith('folder:')) return 'المجلد: ' + ((S.folders[sc.slice(7)] || {}).name || '؟');
+  if (sc.startsWith('folder:')) return 'المجلد: ' + (S.folders[sc.slice(7)] ? folderPath(sc.slice(7)) : '؟');
 }
 function openRules() {
   const rules = Object.entries(S.rules || {});
@@ -2084,7 +2102,7 @@ function openRules() {
 function editRule(id, preset = {}) {
   const r = id ? S.rules[id] : { name: '', keywords: [], match: 'any', field: 'title', scope: 'all', action: 'highlight', color: RULE_COLORS[0], enabled: true, negate: false, ...preset };
   const scopes = `<option value="all">كل المصادر</option>` +
-    Object.entries(S.folders || {}).map(([fid, f]) => `<option value="folder:${esc(fid)}">المجلد: ${esc(f.name)}</option>`).join('') +
+    folderTree().map(([fid]) => `<option value="folder:${esc(fid)}">المجلد: ${esc(folderPath(fid))}</option>`).join('') +
     Object.entries(S.feeds).map(([fid, f]) => `<option value="feed:${esc(fid)}">المصدر: ${esc(f.title)}</option>`).join('');
   const ov = modal(id ? 'تعديل القاعدة' : 'قاعدة جديدة', `
     <div class="fld"><label>اسم القاعدة</label><input class="in" id="ru-name" value="${esc(r.name)}" placeholder="مثال: أخبار الشمال"></div>
@@ -2140,8 +2158,9 @@ function openSettings() {
     <div class="row">
       <div class="fld"><label>صفحة البداية</label><select class="in" id="se-start"><option value="dash">لوحة البداية</option><option value="all">كل المقالات</option></select></div><div class="fld"></div></div>
     <div class="box"><h5>استيراد وتصدير</h5><div style="font-size:13px;color:var(--tx3);margin-bottom:8px">OPML هي الصيغة المعيارية لنقل الاشتراكات من Inoreader وFeedly وغيرها.</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-act="opml-import">${ico('plus')}استيراد OPML</button><button class="btn sm" data-act="opml-export">${ico('ext')}تصدير OPML</button><button class="btn sm" data-act="json-export">${ico('doc')}نسخة احتياطية كاملة</button></div>
-      <input type="file" id="opml-file" accept=".opml,.xml,text/xml" hidden></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-act="opml-import">${ico('plus')}استيراد OPML</button><button class="btn sm" data-act="opml-export">${ico('ext')}تصدير OPML</button><button class="btn sm" data-act="json-import">${ico('plus')}استعادة نسخة احتياطية</button><button class="btn sm" data-act="json-export">${ico('doc')}تصدير نسخة احتياطية</button></div>
+      <input type="file" id="opml-file" accept=".opml,.xml,text/xml" hidden><input type="file" id="json-file" accept=".json,application/json" hidden>
+      <div style="font-size:13px;color:var(--tx3);margin-top:10px">OPML ينقل المصادر والمجلدات فقط. النسخة الاحتياطية الكاملة تحفظ أيضاً الفلاتر والوسوم والمحفوظات والمسودات والإعدادات، ولا يقرؤها إلا S24NReader.</div></div>
     ${CONFIG.WORKER_URL ? '' : `<div class="box"><h5>خادم الجلب</h5><div class="fld" style="margin:0"><input class="in ltr" id="se-worker" value="${esc(workerUrl())}" placeholder="https://s24-reader-proxy.xxx.workers.dev"><div class="hint">رابط Cloudflare Worker (انظر دليل التشغيل). يُحفظ في هذا المتصفح فقط؛ للنشر ضعه في CONFIG.WORKER_URL.</div></div></div>`}
     <div class="box"><h5>الحساب</h5><div style="font-size:13px;color:var(--tx2)">${USER ? `مسجّل باسم <b>${esc(USER.email || USER.displayName)}</b> — بياناتك تتزامن بين أجهزتك.` : 'وضع محلي: البيانات محفوظة في هذا المتصفح فقط.'}</div>
       <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">${USER ? `<button class="btn sm" data-act="logout">تسجيل الخروج</button>` : ''}<button class="btn sm danger" data-act="clear-cache">مسح المقالات المخزّنة</button></div></div>`,
@@ -2149,6 +2168,7 @@ function openSettings() {
   $('#se-theme').value = setting('theme'); $('#se-ref').value = String(setting('refreshMin'));
   $('#se-sort').value = setting('sort'); $('#se-auto').value = setting('autoRead') ? '1' : '0'; $('#se-start').value = setting('start');
   $('#opml-file').addEventListener('change', e => importOpml(e.target.files[0]));
+  $('#json-file').addEventListener('change', e => importBackup(e.target.files[0]));
 }
 function saveSettings() {
   const w = $('#se-worker'); if (w) lsSet('s24r_worker', w.value.trim());
@@ -2159,27 +2179,76 @@ function saveSettings() {
 async function importOpml(file) {
   if (!file) return;
   const x = new DOMParser().parseFromString(await file.text(), 'application/xml');
-  if (x.querySelector('parsererror')) return toast('ملف OPML غير صالح');
-  const upd = {}; const existing = new Set(Object.values(S.feeds).map(f => f.url)); const folderByName = {};
-  Object.entries(S.folders).forEach(([id, f]) => folderByName[f.name] = id);
-  let n = 0;
-  for (const o of x.querySelectorAll('outline[xmlUrl]')) {
-    const url = o.getAttribute('xmlUrl'); if (!url || existing.has(url)) continue; existing.add(url);
-    const parent = o.parentElement && o.parentElement.closest('outline:not([xmlUrl])');
-    let folder = '';
-    if (parent) { const name = parent.getAttribute('title') || parent.getAttribute('text') || 'مجلد'; folder = folderByName[name] || (folderByName[name] = uid()); if (!S.folders[folder] && !upd['folders/' + folder]) upd['folders/' + folder] = { name, order: Date.now() + n }; }
-    upd['feeds/' + uid()] = { title: o.getAttribute('title') || o.getAttribute('text') || hostOf(url), url, siteUrl: o.getAttribute('htmlUrl') || '', type: 'rss', folder, addedAt: Date.now() }; n++;
-  }
+  const body = x.querySelector('parsererror') ? null : x.querySelector('body');
+  if (!body) return toast('ملف OPML غير صالح');
+  const upd = {}, existing = new Set(Object.values(S.feeds).map(f => f.url)), byName = {}, K = (p, n) => p + '\u0001' + n;
+  Object.entries(S.folders || {}).forEach(([id, f]) => byName[K(parentOf(id), f.name)] = id);
+  let n = 0, seq = Date.now();
+  const getFolder = (name, parent) => { const k = K(parent, name); if (byName[k]) return byName[k]; const id = byName[k] = uid(); upd['folders/' + id] = { name, order: seq++, parent }; return id; };
+  // المستوى الأول مجلد رئيسي، والثاني فرعي، وما هو أعمق يُضم إلى أقرب مجلد فرعي
+  const walk = (el, folder, depth) => {
+    for (const o of el.children) {
+      if (o.tagName.toLowerCase() !== 'outline') continue;
+      const url = (o.getAttribute('xmlUrl') || '').trim();
+      if (url) {
+        if (existing.has(url)) continue; existing.add(url);
+        upd['feeds/' + uid()] = { title: o.getAttribute('title') || o.getAttribute('text') || hostOf(url), url, siteUrl: o.getAttribute('htmlUrl') || '', type: o.getAttribute('s24type') === 'html' ? 'html' : 'rss', folder, order: seq++, addedAt: Date.now() }; n++;
+      } else {
+        const name = (o.getAttribute('title') || o.getAttribute('text') || 'مجلد').trim();
+        walk(o, depth === 0 ? getFolder(name, '') : depth === 1 ? getFolder(name, folder) : folder, depth + 1);
+      }
+    }
+  };
+  walk(body, '', 0);
   if (!n) return toast('لا مصادر جديدة في الملف');
   Store.update(upd); closeModal(); toast(`استُورد ${n} مصدر`); renderAll(); refreshAll();
 }
+// استعادة النسخة الاحتياطية الكاملة (JSON): تُضاف إلى البيانات الحالية ولا يُحذف شيء
+async function importBackup(file) {
+  if (!file) return;
+  let d; try { d = JSON.parse(await file.text()); } catch { return toast('ملف النسخة الاحتياطية غير صالح'); }
+  if (!d || typeof d !== 'object' || !d.feeds || typeof d.feeds !== 'object') return toast('هذا ليس ملف نسخة احتياطية من S24NReader');
+  const urls = new Map(Object.entries(S.feeds).map(([id, f]) => [f.url, id])), upd = {}; let n = 0;
+  // المجلد الموجود عندك بالاسم نفسه وفي المكان نفسه يُعاد استعماله بدل إنشاء نسخة مكررة
+  const B = typeof d.folders === 'object' && d.folders || {}, fmap = {};
+  const bPar = id => { const p = B[id] && B[id].parent; return p && p !== id && B[p] && !B[p].parent ? p : ''; };
+  for (const pass of [0, 1]) for (const [id, v] of Object.entries(B)) {
+    if (!v || !!bPar(id) !== !!pass || S.folders[id]) continue;
+    const par = bPar(id) ? (fmap[bPar(id)] || bPar(id)) : '';
+    const ex = Object.keys(S.folders || {}).find(f => S.folders[f].name === v.name && parentOf(f) === par); if (ex) fmap[id] = ex;
+  }
+  const FM = f => fmap[f] || f || '';
+  for (const k of ['folders', 'feeds', 'rules', 'saved', 'drafts', 'tags', 'itags', 'notes']) {
+    const src = d[k]; if (!src || typeof src !== 'object') continue;
+    for (let [id, v] of Object.entries(src)) {
+      if (v == null || /[.#$\[\]\/]/.test(id)) continue;
+      if (k === 'folders') { if (fmap[id]) continue; v = { ...v, parent: FM(bPar(id)) }; }
+      if (k === 'feeds') { const ex = urls.get(v.url); if (ex && ex !== id) continue; v = { ...v, folder: FM(v.folder) }; }   // المصدر الموجود عندك أصلاً لا يُكرَّر
+      if (k === 'rules' && (v.scope || '').startsWith('folder:')) v = { ...v, scope: 'folder:' + FM(v.scope.slice(7)) };
+      upd[`${k}/${id}`] = v; n++;
+    }
+  }
+  if (!n) return toast('لا بيانات في الملف');
+  if (!confirm(`استعادة ${n} عنصراً من النسخة الاحتياطية؟\nتُضاف إلى بياناتك الحالية، والعنصر الموجود بالمعرّف نفسه يُستبدل بنسخته من الملف. لن يُحذف شيء.`)) return;
+  if (d.settings && typeof d.settings === 'object') upd.settings = { ...S.settings, ...d.settings };
+  Store.update(upd); closeModal(); toast('استُعيدت النسخة الاحتياطية'); renderAll(); refreshAll();
+}
 function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
-function exportOpml() {
-  const ex = s => esc(s);
-  const row = f => `      <outline type="rss" text="${ex(f.title)}" title="${ex(f.title)}" xmlUrl="${ex(f.url)}" htmlUrl="${ex(f.siteUrl || '')}"/>`;
-  let body = Object.entries(S.folders).map(([id, fo]) => `    <outline text="${ex(fo.name)}" title="${ex(fo.name)}">\n${feedsInFolder(id).map(([, f]) => row(f)).join('\n')}\n    </outline>`).join('\n');
-  body += '\n' + feedsInFolder('').map(([, f]) => row(f).slice(2)).join('\n');
-  download('s24nreader-subscriptions.opml', `<?xml version="1.0" encoding="UTF-8"?>\n<opml version="2.0">\n  <head><title>${ex(CONFIG.APP_NAME)}</title></head>\n  <body>\n${body}\n  </body>\n</opml>\n`, 'text/x-opml');
+async function exportOpml(anchor) {
+  const k = anchor ? await popMenu(anchor, [{ k: 'full', icon: 'folder', label: 'كامل بالمجلدات الفرعية (لـ S24NReader)' }, { k: 'flat', icon: 'ext', label: 'متوافق مع القارئات الأخرى (مستوى واحد)' }]) : 'full';
+  if (!k) return;
+  const ex = s => esc(s || ''), I = n => ' '.repeat(n);
+  const row = (f, ind) => `${I(ind)}<outline type="rss" text="${ex(f.title)}" title="${ex(f.title)}" xmlUrl="${ex(f.url)}" htmlUrl="${ex(f.siteUrl)}"${f.type === 'html' ? ' s24type="html"' : ''}/>`;
+  const feeds = (fid, ind) => feedsInFolder(fid).map(([, f]) => row(f, ind));
+  const box = (name, inner, ind) => `${I(ind)}<outline text="${ex(name)}" title="${ex(name)}">` + (inner.length ? `\n${inner.join('\n')}\n${I(ind)}` : '') + '</outline>';
+  const out = [];
+  for (const [fid, fo] of foldersSorted('')) {
+    const subs = foldersSorted(fid);
+    if (k === 'flat') { out.push(box(fo.name, feeds(fid, 6), 4)); subs.forEach(([sid, so]) => out.push(box(fo.name + ' / ' + so.name, feeds(sid, 6), 4))); }
+    else out.push(box(fo.name, [...subs.map(([sid, so]) => box(so.name, feeds(sid, 8), 6)), ...feeds(fid, 6)], 4));
+  }
+  out.push(...feeds('', 4));
+  download(k === 'flat' ? 's24nreader-subscriptions-flat.opml' : 's24nreader-subscriptions.opml', `<?xml version="1.0" encoding="UTF-8"?>\n<opml version="2.0">\n  <head><title>${ex(CONFIG.APP_NAME)}</title></head>\n  <body>\n${out.join('\n')}\n  </body>\n</opml>\n`, 'text/x-opml');
 }
 
 /* ---------- الدخول (Firebase) ---------- */
@@ -2257,10 +2326,10 @@ document.addEventListener('touchmove', e => { if (DRAG && DRAG.on) e.preventDefa
 $('#side').addEventListener('contextmenu', e => { if (e.target.closest('[data-drag]')) e.preventDefault(); });
 
 $('#side').addEventListener('pointerdown', e => {
-  const row = e.target.closest('[data-drag="feed"]');
+  const row = e.target.closest('[data-drag]');
   if (!row || e.target.closest('.more') || (e.pointerType === 'mouse' && e.button !== 0)) return;
   if (e.pointerType === 'mouse') e.preventDefault();
-  DRAG = { id: row.dataset.id, row, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, on: false, touch: e.pointerType !== 'mouse', pid: e.pointerId };
+  DRAG = { kind: row.dataset.drag, id: row.dataset.id, row, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, on: false, touch: e.pointerType !== 'mouse', pid: e.pointerId };
   if (DRAG.touch) DRAG.timer = setTimeout(() => DRAG && startFeedDrag(), 380);
   document.addEventListener('pointermove', onFeedDragMove);
   document.addEventListener('pointerup', endFeedDrag);
@@ -2275,7 +2344,7 @@ function startFeedDrag() {
   d.ghost = d.row.cloneNode(true); d.ghost.classList.remove('act', 'drop-in'); d.ghost.classList.add('drag-ghost');
   d.ghost.style.width = r.width + 'px'; document.body.appendChild(d.ghost);
   d.line = document.createElement('div'); d.line.className = 'drop-line hidden'; document.body.appendChild(d.line);
-  d.row.classList.add('dragging-src'); document.body.classList.add('feed-dragging');
+  (d.kind === 'folder' ? d.row.parentElement : d.row).classList.add('dragging-src'); document.body.classList.add('feed-dragging');
   placeGhost(); trackDrop();
   const loop = () => { if (!DRAG || !DRAG.on) return; autoScrollSide(); DRAG.raf = requestAnimationFrame(loop); }; loop();
 }
@@ -2298,6 +2367,7 @@ function autoScrollSide() {
   trackDrop();
 }
 function trackDrop() {
+  if (DRAG.kind === 'folder') return trackFolderDrop();
   const d = DRAG; let tgt = null;
   $$('#side .drop-in').forEach(n => n.classList.remove('drop-in'));
   const el = document.elementFromPoint(d.x, d.y);
@@ -2324,6 +2394,55 @@ function trackDrop() {
   if (!tgt || tgt.end) d.line.classList.add('hidden');
   d.tgt = tgt;
 }
+// سحب مجلد: بين مجلدات المستوى نفسه (أعلى رأس المجلد أو أسفله)، أو إلى داخل مجلد رئيسي (منتصف رأسه) ليصير فرعياً
+function canNest(id, into) { return into !== id && !parentOf(into) && !foldersSorted(id).length; }
+function folderEl(fid) { return $(`#side .folder[data-fid="${CSS.escape(fid)}"]`); }
+function trackFolderDrop() {
+  const d = DRAG; d.tgt = null; d.line.classList.add('hidden');
+  $$('#side .drop-in').forEach(n => n.classList.remove('drop-in'));
+  const el = document.elementFromPoint(d.x, d.y);
+  if (!el || !el.closest('#side') || el.closest('.folder.dragging-src')) return;
+  const blk = el.closest('.folder[data-fid]');
+  if (!blk) {   // خارج المجلدات: أول المستوى الرئيسي أو آخره
+    const tops = foldersSorted('').map(([i]) => i); if (!tops.length) return;
+    const first = folderEl(tops[0]), last = folderEl(tops[tops.length - 1]);
+    if (d.y < first.getBoundingClientRect().top) return setFolderTgt('', tops[0], first.firstElementChild.getBoundingClientRect(), first.getBoundingClientRect().top);
+    return setFolderTgt('', null, last.firstElementChild.getBoundingClientRect(), last.getBoundingClientRect().bottom);
+  }
+  const fid = blk.dataset.fid, hr = blk.firstElementChild.getBoundingClientRect(), par = parentOf(fid);
+  const inHead = d.y <= hr.bottom, rel = (d.y - hr.top) / hr.height;
+  if (!inHead || (rel > .25 && rel < .75)) {
+    const into = !inHead && par ? par : fid;   // فوق مصادر مجلد فرعي = إلى مجلده الرئيسي
+    if (canNest(d.id, into)) { folderEl(into).firstElementChild.classList.add('drop-in'); d.tgt = { parent: into, before: null }; return; }
+    if (!inHead) return;
+  }
+  if (par && foldersSorted(d.id).length) return;   // مجلد له فروع لا يصير فرعياً
+  const after = rel >= .5, sibs = foldersSorted(par).map(([i]) => i).filter(i => i !== d.id);
+  const before = sibs[sibs.indexOf(fid) + (after ? 1 : 0)] || null;
+  setFolderTgt(par, before, hr, after ? blk.getBoundingClientRect().bottom : hr.top);
+}
+function setFolderTgt(parent, before, r, y) {
+  const d = DRAG;
+  if (parentOf(d.id) === parent) { const cur = foldersSorted(parent).map(([i]) => i); if ((cur[cur.indexOf(d.id) + 1] || null) === before) return; }   // في مكانه أصلاً
+  d.tgt = { parent, before }; showLine(r, y);
+}
+function dropFolder(t, id) {
+  if (!t || !S.folders[id]) return;
+  const list = foldersSorted(t.parent).map(([i]) => i).filter(i => i !== id);
+  const at = t.before ? list.indexOf(t.before) : -1;
+  list.splice(at < 0 ? list.length : at, 0, id);
+  const upd = {}, moved = parentOf(id) !== t.parent;
+  list.forEach((fid, i) => { if (S.folders[fid].order !== (i + 1) * 10) upd[`folders/${fid}/order`] = (i + 1) * 10; });
+  if (moved) upd[`folders/${id}/parent`] = t.parent;
+  if (!Object.keys(upd).length) return;
+  Store.update(upd);
+  if (moved) {
+    const nm = S.folders[id].name;
+    if (t.parent) { collapsed.delete(t.parent); lsSet('s24r_collapsed', [...collapsed]); toast(`صار «${nm}» داخل «${S.folders[t.parent].name}»`); }
+    else toast(`صار «${nm}» مجلداً رئيسياً`);
+  }
+  renderAll();
+}
 function showLine(r, y) { const l = DRAG.line; l.classList.remove('hidden'); l.style.left = r.left + 'px'; l.style.width = r.width + 'px'; l.style.top = (y - 1) + 'px'; }
 function cleanupFeedDrag() {
   const d = DRAG; if (!d) return;
@@ -2342,6 +2461,7 @@ function endFeedDrag(e) {
   if (!d.on) { cleanupFeedDrag(); return; }   // لم يحدث سحب: نقرة عادية تفتح المصدر
   DRAG_CLICK_BLOCK = true; setTimeout(() => DRAG_CLICK_BLOCK = false, 0);
   const t = d.tgt, id = d.id; cleanupFeedDrag();
+  if (d.kind === 'folder') return dropFolder(t, id);
   if (!t || !S.feeds[id]) return;
   const list = feedsInFolder(t.folder).map(([i]) => i).filter(i => i !== id);
   const at = t.before ? list.indexOf(t.before) : -1;
@@ -2435,7 +2555,8 @@ document.addEventListener('click', async e => {
       case 'rule-save': saveRule(); break;
       case 'rule-del': if (confirm('حذف القاعدة؟')) { const rid = $('#ov').dataset.id; Store.write('rules/' + rid, null); if (VIEW.type === 'rule' && VIEW.id === rid) { closeModal(); setView({ type: 'all' }); } else { openRules(); scheduleRender(); } } break;
       case 'opml-import': $('#opml-file').click(); break;
-      case 'opml-export': exportOpml(); break;
+      case 'opml-export': exportOpml(t); break;
+      case 'json-import': $('#json-file').click(); break;
       case 'json-export': download('s24nreader-backup.json', JSON.stringify({ ...S, states: undefined }, null, 2), 'application/json'); break;
       case 'clear-cache': if (confirm('مسح المقالات المخزّنة مؤقتاً؟ (لن تُحذف مصادرك أو المحفوظات)')) { IDB.clear(); ITEMS.clear(); closeModal(); renderAll(); refreshAll(); } break;
       case 'logout': logout(); break;
