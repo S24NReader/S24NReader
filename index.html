@@ -359,8 +359,9 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
 .main.nopanel.cards-mode,.main.dash-mode{grid-template-columns:minmax(0,1fr)}
 .main.nopanel #rs-list{right:var(--w-list)}
 @media (min-width:761px){
-  .main.nopanel .side,.main.dash-mode .side{display:none}
-  .main.nopanel #rs-side,.main.dash-mode .col-rs{display:none}
+  .main.nopanel .side{display:none}
+  .main.nopanel #rs-side,.main.dash-mode #rs-list{display:none}
+  .main.dash-mode:not(.nopanel){grid-template-columns:var(--w-side) minmax(0,1fr)}
 }
 /* رأس القائمة */
 .list{container-type:inline-size}
@@ -648,7 +649,8 @@ let USER = null;
 let REFRESHING = false;
 const collapsed = new Set(lsGet('s24r_collapsed', []));
 let DRAG = null;                  // حالة سحب مصدر في الشريط الجانبي
-let PANEL_OFF = lsGet('s24r_nopanel', false);   // إخفاء اللوحة الجانبية (لكل جهاز)
+let PANEL_OFF = lsGet('s24r_nopanel', false);   // إخفاء اللوحة الجانبية (لكل جهاز) 
+let DASH_PANEL = lsGet('s24r_dashpanel', false); // إظهار المصادر بجانب لوحة البداية (لكل جهاز)
 const KEEP_VIS = new Set();       // مقالات قُرئت في هذه الصفحة: تبقى ظاهرة حتى الانتقال إلى قسم آخر
 let DASH_CTX = [];                // ترتيب مقالات المربع الذي فُتحت منه المقالة في لوحة البداية (للسابقة والتالية)
 const setting = k => (S.settings && S.settings[k] != null) ? S.settings[k] : DEFAULT_SETTINGS[k];
@@ -1160,8 +1162,13 @@ function panelKind() { return ['starred', 'later', 'tag'].includes(VIEW.type) ? 
 function railKind() { return VIEW.type === 'dash' || VIEW.type === 'drafts' ? VIEW.type : panelKind(); }
 const fmtN = n => !n ? '' : n >= 1000 ? (n >= 10000 ? Math.floor(n / 1000) : (Math.floor(n / 100) / 10)) + 'k' : String(n);
 const countSaved = f => Object.values(S.saved || {}).filter(it => st(it.id)[f]).length;
-function applyPanel() { $('#main').classList.toggle('nopanel', PANEL_OFF || VIEW.type === 'dash' || VIEW.type === 'drafts'); }
-function togglePanel() { PANEL_OFF = !PANEL_OFF; lsSet('s24r_nopanel', PANEL_OFF); renderSide(); }
+const panelOff = () => VIEW.type === 'drafts' || (VIEW.type === 'dash' ? !DASH_PANEL : PANEL_OFF);
+function applyPanel() { $('#main').classList.toggle('nopanel', panelOff()); }
+function togglePanel() {
+  if (VIEW.type === 'dash') { DASH_PANEL = !DASH_PANEL; lsSet('s24r_dashpanel', DASH_PANEL); }
+  else { PANEL_OFF = !PANEL_OFF; lsSet('s24r_nopanel', PANEL_OFF); }
+  renderSide();
+}
 
 function renderRail(UC) {
   const k = railKind(), dark = document.documentElement.dataset.theme === 'dark';
@@ -1178,7 +1185,7 @@ function renderRail(UC) {
     + `<button class="rl hide-m" data-act="theme" id="theme-btn" title="${dark ? 'الوضع النهاري' : 'الوضع الليلي'}">${ico(dark ? 'sun' : 'moon')}</button>`
     + `<button class="rl hide-m" data-act="settings" title="الإعدادات">${ico('gear')}</button>`
     + `<button class="rl rl-me" data-act="me-menu" title="${esc(USER ? (USER.email || USER.displayName || '') : 'وضع محلي')}">${me ? `<span class="av">${esc(me)}</span>` : ico('user')}</button>`
-    + `<button class="rl hide-m rl-col${PANEL_OFF ? ' off' : ''}" data-act="toggle-panel" title="${PANEL_OFF ? 'إظهار اللوحة الجانبية' : 'إخفاء اللوحة الجانبية'}">${ico('dbl')}</button>`;
+    + (VIEW.type === 'drafts' ? '' : `<button class="rl hide-m rl-col${panelOff() ? ' off' : ''}" data-act="toggle-panel" title="${panelOff() ? 'إظهار اللوحة الجانبية' : 'إخفاء اللوحة الجانبية'}">${ico('dbl')}</button>`);
 }
 
 function renderSide(force) {
