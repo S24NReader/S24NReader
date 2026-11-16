@@ -757,6 +757,25 @@ async function fetchViaGas(url) {
 
 const absUrl = (u, base) => { try { const x = new URL(u, base); return /^https?:$/.test(x.protocol) ? x.href : ''; } catch { return ''; } };
 const txt = el => el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '';
+// قراءة التاريخ بتسامح: يصلح صيغاً شائعة الخطأ مثل 2026-11-16T09:17:54:00+0300 (تلفزيون سوريا)
+function parseDateLoose(s) {
+  s = (s || '').trim(); if (!s) return NaN;
+  const t = Date.parse(s); if (!isNaN(t)) return t;
+  s = s.replace(/^(\d{4}-\d\d-\d\d)[ T]+/, '$1T').replace(/(T\d\d:\d\d:\d\d)(?::\d\d)+/, '$1')
+       .replace(/\s*([+-]\d\d):?(\d\d)$/, '$1:$2').replace(/\s*(UTC|GMT)$/i, 'Z');
+  return Date.parse(s);
+}
+// تاريخ النشر من صفحة المقالة نفسها (للمواقع التي بلا RSS)
+function pageDate(d) {
+  for (const sel of ['meta[property="article:published_time"]', 'meta[name="article:published_time"]', 'meta[property="og:published_time"]', 'meta[itemprop="datePublished"]', 'meta[name="pubdate"]', 'meta[name="publish-date"]', 'meta[name="date"]', 'meta[name="dc.date"]']) {
+    const m = d.querySelector(sel); const t = m && parseDateLoose(m.getAttribute('content')); if (t) return t;
+  }
+  for (const sc of d.querySelectorAll('script[type="application/ld+json"]')) {
+    const m = (sc.textContent || '').match(/"datePublished"\s*:\s*"([^"]+)"/); const t = m && parseDateLoose(m[1]); if (t) return t;
+  }
+  const el = d.querySelector('article time[datetime], [itemprop="datePublished"][datetime], time[datetime]');
+  return el ? parseDateLoose(el.getAttribute('datetime')) : NaN;
+}
 // بحث عن وسم بالاسم مع تجاهل البادئة (media:content, content:encoded…)
 const byName = (el, name) => { for (const c of el.children) if (c.localName === name || c.nodeName === name) return c; return null; };
 const allByName = (el, name) => [...el.children].filter(c => c.localName === name || c.nodeName === name);
@@ -788,7 +807,7 @@ function parseFeedXml(x, url) {
       out.items.push({
         guid: txt(byName(e, 'id')), title: txt(byName(e, 'title')),
         link: lk ? absUrl(lk.getAttribute('href'), url) : '',
-        date: Date.parse(txt(byName(e, 'published')) || txt(byName(e, 'updated'))),
+        date: parseDateLoose(txt(byName(e, 'published')) || txt(byName(e, 'updated'))),
         html: content ? content.textContent : '',
         author: txt(byName(byName(e, 'author') || e, 'name')),
         image: mediaImage(e, url),
@@ -804,7 +823,7 @@ function parseFeedXml(x, url) {
       out.items.push({
         guid: txt(byName(e, 'guid')), title: txt(byName(e, 'title')),
         link: absUrl(txt(byName(e, 'link')) || txt(byName(e, 'guid')), url),
-        date: Date.parse(txt(byName(e, 'pubDate')) || txt(byName(e, 'date'))),
+        date: parseDateLoose(txt(byName(e, 'pubDate')) || txt(byName(e, 'date'))),
         html: (enc && enc.textContent.length > (desc ? desc.textContent.length : 0)) ? enc.textContent : (desc ? desc.textContent : ''),
         author: txt(byName(e, 'creator')) || txt(byName(e, 'author')),
         image: mediaImage(e, url),
@@ -866,7 +885,7 @@ function scrapeLinks(doc, pageUrl) {
     const tEl = box && box.querySelector('time[datetime]');
     const prev = found.get(key);
     if (!prev || score > prev.score || (score === prev.score && title.length > prev.title.length)) {
-      found.set(key, { link: key, guid: key, title, image, score, order: prev ? prev.order : order++, date: tEl ? Date.parse(tEl.getAttribute('datetime')) : NaN, html: '' });
+      found.set(key, { link: key, guid: key, title, image, score, order: prev ? prev.order : order++, date: tEl ? parseDateLoose(tEl.getAttribute('datetime')) : NaN, html: '' });
     }
   }
   return [...found.values()].sort((a, b) => a.order - b.order).slice(0, 60);
@@ -935,6 +954,31 @@ async function ogFetch(id) {
   const c = img && document.querySelector(`#items.cards .it[data-item="${CSS.escape(id)}"]`);
   if (c && !c.querySelector('.it-th')) c.insertAdjacentHTML('afterbegin', `<img class="it-th" src="${esc(it.image)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">`);
 }
+// جلب تاريخ النشر الحقيقي من صفحة كل خبر جديد في المواقع التي بلا RSS (مرة واحدة لكل خبر)
+const DATE_Q = []; let DATE_RUN = 0;
+function datePump() { while (DATE_RUN < 2 && DATE_Q.length) { DATE_RUN++; dateFetch(DATE_Q.shift()).finally(() => { DATE_RUN--; datePump(); }); } }
+async function dateFetch(id) {
+  const it0 = ITEMS.get(id); if (!it0 || it0.dChk || !it0.link) return;
+  let d, fu;
+  try { const r = await fetchText(it0.link); fu = r.finalUrl; d = new DOMParser().parseFromString(r.text, 'text/html'); }
+  catch { return; } // خطأ شبكة: نعيد المحاولة في تحديث لاحق
+  const it = ITEMS.get(id) || it0; it.dChk = 1;
+  const t = pageDate(d);
+  if (t) { it.pDate = Math.min(t, Date.now() + 3600e3); it.date = it.pDate; it.est = 0; }
+  if (!it.image && !it.noImg) { const m = d.querySelector('meta[property="og:image"],meta[name="twitter:image"]'); const img = m ? absUrl(m.getAttribute('content') || '', fu) : ''; if (img) it.image = bigImg(img); }
+  ogSave(it.feedId); scheduleRender();
+}
+// الخبر نفسه من مصدرين (RSS وصفحة قسم): يظهر مرة واحدة، والأولوية لنسخة RSS
+const linkKey = u => { try { const x = new URL(u); return (x.hostname.replace(/^www\./, '') + decodeURIComponent(x.pathname).replace(/\/+$/, '')).toLowerCase(); } catch { return u || ''; } };
+function dedupeByLink(list) {
+  const best = new Map();
+  for (const it of list) {
+    const k = linkKey(it.link); if (!k) continue; const b = best.get(k);
+    const rank = x => (S.feeds[x.feedId] || {}).type === 'html' ? 1 : 0;
+    if (!b || rank(it) < rank(b)) best.set(k, it);
+  }
+  return list.filter(it => { const k = linkKey(it.link); return !k || best.get(k) === it; });
+}
 function ogSave(fid) {
   clearTimeout(OG_SAVE[fid]);
   OG_SAVE[fid] = setTimeout(() => IDB.put({ feedId: fid, items: [...ITEMS.values()].filter(i => i.feedId === fid), fetchedAt: (FEED_STATUS[fid] || {}).fetchedAt || Date.now() }), 1500);
@@ -979,7 +1023,8 @@ async function refreshFeed(feedId) {
       const html = sanitize(r.html, r.link || finalUrl);
       const item = {
         id, feedId, title: r.title || '(بلا عنوان)', link: r.link, author: r.author || '',
-        date: isNaN(r.date) ? firstSeen : Math.min(r.date, now + 3600e3), firstSeen,
+        date: isNaN(r.date) ? ((prev && prev.pDate) || firstSeen) : Math.min(r.date, now + 3600e3), firstSeen,
+        est: isNaN(r.date) && !(prev && prev.pDate) ? 1 : 0, pDate: prev && prev.pDate, dChk: prev && prev.dChk,
         html, text: plain(html).slice(0, 400), image: bigImg(r.image || firstImg(html, r.link || finalUrl)) || (prev && prev.image) || '', noImg: prev && prev.noImg, cats: [...new Set(r.cats || [])],
       };
       if (!prev) fresh.push(item);
@@ -991,6 +1036,7 @@ async function refreshFeed(feedId) {
     IDB.put({ feedId, items, fetchedAt: now });
     FEED_STATUS[feedId] = { fetchedAt: now, error: '', loading: false };
     if (fresh.length) applyRuleActions(fresh);
+    if (feed.type === 'html') { items.filter(it => it.est && !it.dChk).slice(0, 30).forEach(it => DATE_Q.push(it.id)); datePump(); }
   } catch (e) {
     FEED_STATUS[feedId] = { ...(FEED_STATUS[feedId] || {}), error: e.message, loading: false };
   }
@@ -1144,6 +1190,7 @@ function currentItems(opts = {}) {
       list = pr ? list.filter(it => ruleHit(pr, it)) : [];
     } else list = list.filter(it => !isHidden(it));
     if (setting('listFilter') === 'unread' && !opts.all) list = list.filter(it => !isRead(it.id) || it.id === SEL || KEEP_VIS.has(it.id));
+    list = dedupeByLink(list);
   }
   if (QUERY) { const q = normAr(QUERY); list = list.filter(it => normAr(it.title + ' ' + (it.text || '')).includes(q)); }
   const dir = setting('sort') === 'old' ? 1 : -1;
@@ -1505,7 +1552,7 @@ function metaModal() {
     ${row('اللغة', detectLang((it.title || '') + ' ' + (it.text || '')))}
     ${row('تاريخ النشر', esc(fullDate(it.date)))}
     ${it.firstSeen ? row('وصلت إلى القارئ', esc(fullDate(it.firstSeen))) : ''}
-    ${row('النص', FULLTEXT.has(it.id) ? 'النص الكامل من الموقع' : 'نص الخلاصة (RSS)')}
+    ${row('النص', FULLTEXT.has(it.id) ? 'النص الكامل من الموقع' : (f.type === 'html' ? 'عنوان من صفحة الموقع (بلا RSS)' : 'نص الخلاصة (RSS)'))}
   </div>`, '', 'lg');
 }
 
@@ -2163,7 +2210,7 @@ function openSettings() {
       <div style="font-size:13px;color:var(--tx3);margin-top:10px">OPML ينقل المصادر والمجلدات فقط. النسخة الاحتياطية الكاملة تحفظ أيضاً الفلاتر والوسوم والمحفوظات والمسودات والإعدادات، ولا يقرؤها إلا S24NReader.</div></div>
     ${CONFIG.WORKER_URL ? '' : `<div class="box"><h5>خادم الجلب</h5><div class="fld" style="margin:0"><input class="in ltr" id="se-worker" value="${esc(workerUrl())}" placeholder="https://s24-reader-proxy.xxx.workers.dev"><div class="hint">رابط Cloudflare Worker (انظر دليل التشغيل). يُحفظ في هذا المتصفح فقط؛ للنشر ضعه في CONFIG.WORKER_URL.</div></div></div>`}
     <div class="box"><h5>الحساب</h5><div style="font-size:13px;color:var(--tx2)">${USER ? `مسجّل باسم <b>${esc(USER.email || USER.displayName)}</b> — بياناتك تتزامن بين أجهزتك.` : 'وضع محلي: البيانات محفوظة في هذا المتصفح فقط.'}</div>
-      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">${USER ? `<button class="btn sm" data-act="logout">تسجيل الخروج</button>` : ''}<button class="btn sm danger" data-act="clear-cache">مسح المقالات المخزّنة</button></div></div>`,
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">${IS_ADMIN ? `<button class="btn sm pri" data-act="access-admin">${ico('user')}إدارة الوصول</button>` : ''}${USER ? `<button class="btn sm" data-act="logout">تسجيل الخروج</button>` : ''}<button class="btn sm danger" data-act="clear-cache">مسح المقالات المخزّنة</button></div></div>`,
     `<button class="btn pri" data-act="se-save">حفظ</button><button class="btn" data-act="close-modal">إغلاق</button>`, 'lg');
   $('#se-theme').value = setting('theme'); $('#se-ref').value = String(setting('refreshMin'));
   $('#se-sort').value = setting('sort'); $('#se-auto').value = setting('autoRead') ? '1' : '0'; $('#se-start').value = setting('start');
@@ -2275,9 +2322,76 @@ async function authAction(kind) {
   try {
     if (kind === 'google') await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
     else if (kind === 'in') await auth.signInWithEmailAndPassword(email.trim(), pass);
-    else if (kind === 'up') await auth.createUserWithEmailAndPassword(email.trim(), pass);
+    else if (kind === 'up') { const c = await auth.createUserWithEmailAndPassword(email.trim(), pass); await c.user.sendEmailVerification().catch(() => {}); }
     else if (kind === 'reset') { await auth.sendPasswordResetEmail(email.trim()); renderAuth('in', '✓ أُرسل رابط الاستعادة إلى بريدك'); }
   } catch (e) { renderAuth(kind === 'google' ? 'in' : mode, AUTH_ERR[e.code] || e.message); }
+}
+/* ---------- إذن الدخول: لا يفتح التطبيق إلا لبريد اعتمده المدير ---------- */
+// المفتاح في قاعدة البيانات: البريد بأحرف صغيرة والنقاط فواصل (Firebase لا يقبل النقطة في المفاتيح)
+const emailKey = e => (e || '').trim().toLowerCase().replace(/\./g, ',');
+let IS_ADMIN = false, STARTED = false, GATE_REF = null, ACC_REQ = {};
+async function gate(u) {
+  if (!u || !u.email) return gateScreen('noemail');
+  if (!u.emailVerified) return gateScreen('verify');
+  const db = Store.db, k = emailKey(u.email);
+  let adm = false, ok = false, req = null;
+  try {
+    adm = (await db.ref('access/admins/' + k).once('value')).val() === true;
+    ok = adm || (await db.ref('access/allow/' + k).once('value')).val() === true;
+  } catch (e) { return gateScreen('error', e.message); }
+  IS_ADMIN = adm;
+  if (ok) {
+    if (GATE_REF) { GATE_REF.off(); GATE_REF = null; }
+    if (!STARTED) { STARTED = true; start(); if (adm) watchRequests(); }
+    return;
+  }
+  try {
+    const r = db.ref('access/requests/' + u.uid); req = (await r.once('value')).val();
+    if (!req) { req = { email: u.email, name: u.displayName || '', at: Date.now() }; await r.set(req); }
+  } catch {}
+  gateScreen(req && req.st === 'no' ? 'rejected' : 'pending');
+  if (!GATE_REF) { // يُفتح التطبيق تلقائياً لحظة الموافقة
+    GATE_REF = db.ref('access/allow/' + k);
+    GATE_REF.on('value', s => { if (s.val() === true) gate(u); });
+  }
+}
+function gateScreen(kind, msg = '') {
+  const a = $('#auth'); a.classList.remove('hidden');
+  const em = `<b dir="ltr">${esc((USER && USER.email) || '')}</b>`;
+  const T = {
+    verify: ['تأكيد البريد', `أرسلنا رابط تأكيد إلى ${em}. افتح الرابط من بريدك، ثم اضغط «تحقّقت».`, `<button class="btn pri" data-act="gate-check">تحقّقت — متابعة</button><button class="btn" data-act="gate-resend">إعادة إرسال الرابط</button>`],
+    pending: ['بانتظار الموافقة', `التطبيق متاح بدعوة فقط. وصل طلبك بالبريد ${em} إلى المدير، وتُفتح الصفحة تلقائياً لحظة الموافقة.`, `<button class="btn" data-act="gate-check">تحقّق الآن</button>`],
+    rejected: ['لا يمكن الدخول', `لم تتم الموافقة على البريد ${em}.`, ''],
+    noemail: ['لا يوجد بريد', 'هذا الحساب بلا بريد إلكتروني، فلا يمكن اعتماده.', ''],
+    error: ['تعذّر التحقق', esc(msg), `<button class="btn" data-act="gate-check">إعادة المحاولة</button>`],
+  }[kind];
+  a.innerHTML = `<div class="auth-card"><h3 style="margin:0 0 12px;text-align:center">${T[0]}</h3><p class="sub" style="line-height:1.9">${T[1]}</p><div style="display:flex;flex-direction:column;gap:8px">${T[2]}<button class="btn" data-act="gate-out">تسجيل الخروج</button></div></div>`;
+}
+// تنبيه المدير بكل طلب جديد أثناء فتح التطبيق
+function watchRequests() {
+  Store.db.ref('access/requests').orderByChild('at').startAt(Date.now()).on('child_added', s => {
+    const q = s.val() || {}; toast('طلب وصول جديد: ' + (q.email || ''), 6000);
+  });
+}
+async function accessAdmin() {
+  const db = Store.db; let rq, al;
+  try { [rq, al] = await Promise.all([db.ref('access/requests').once('value'), db.ref('access/allow').once('value')]); }
+  catch (e) { return toast('تعذّر فتح إدارة الوصول: ' + e.message); }
+  const reqs = Object.entries(rq.val() || {}).sort((a, b) => (b[1].at || 0) - (a[1].at || 0));
+  const allow = al.val() || {}; ACC_REQ = Object.fromEntries(reqs);
+  const pend = reqs.filter(([, q]) => !allow[emailKey(q.email)] && q.st !== 'no');
+  const rej = reqs.filter(([, q]) => q.st === 'no' && !allow[emailKey(q.email)]);
+  const RS = 'display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)';
+  const who = q => `<div><b dir="ltr">${esc(q.email)}</b>${q.name ? ' · ' + esc(q.name) : ''}<div class="hint">${q.at ? esc(fullDate(q.at)) : ''}</div></div>`;
+  modal('إدارة الوصول', `
+    <div class="box"><h5>طلبات بانتظار الموافقة (${pend.length})</h5>
+      ${pend.length ? pend.map(([u, q]) => `<div style="${RS}">${who(q)}<span style="display:flex;gap:6px;flex:none"><button class="btn sm pri" data-act="acc-ok" data-id="${esc(u)}">موافقة</button><button class="btn sm danger" data-act="acc-no" data-id="${esc(u)}">رفض</button></span></div>`).join('') : '<div class="hint">لا طلبات جديدة.</div>'}</div>
+    <div class="box"><h5>البريد المعتمد (${Object.keys(allow).length})</h5>
+      <div class="row"><input class="in ltr" id="acc-new" type="email" placeholder="name@example.com"><button class="btn sm pri" style="flex:none" data-act="acc-add">اعتماد بريد</button></div>
+      <div class="hint">يمكنك اعتماد بريد مسبقاً، فيدخل صاحبه مباشرة دون طلب.</div>
+      ${Object.keys(allow).sort().map(k => `<div style="${RS}"><b dir="ltr">${esc(k.replace(/,/g, '.'))}</b><button class="btn sm danger" style="flex:none" data-act="acc-del" data-id="${esc(k)}">إلغاء الاعتماد</button></div>`).join('')}</div>
+    ${rej.length ? `<div class="box"><h5>مرفوضون (${rej.length})</h5>${rej.map(([u, q]) => `<div style="${RS}">${who(q)}<span style="display:flex;gap:6px;flex:none"><button class="btn sm" data-act="acc-ok" data-id="${esc(u)}">موافقة</button><button class="btn sm" data-act="acc-forget" data-id="${esc(u)}">حذف الطلب</button></span></div>`).join('')}</div>` : ''}`,
+    `<button class="btn" data-act="close-modal">إغلاق</button>`, 'lg');
 }
 function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
 
@@ -2560,6 +2674,15 @@ document.addEventListener('click', async e => {
       case 'json-export': download('s24nreader-backup.json', JSON.stringify({ ...S, states: undefined }, null, 2), 'application/json'); break;
       case 'clear-cache': if (confirm('مسح المقالات المخزّنة مؤقتاً؟ (لن تُحذف مصادرك أو المحفوظات)')) { IDB.clear(); ITEMS.clear(); closeModal(); renderAll(); refreshAll(); } break;
       case 'logout': logout(); break;
+      case 'gate-out': firebase.auth().signOut().then(() => location.reload()); break;
+      case 'gate-check': USER.reload().then(() => USER.getIdToken(true)).then(() => gate(firebase.auth().currentUser)).catch(e => gateScreen('error', e.message)); break;
+      case 'gate-resend': USER.sendEmailVerification().then(() => toast('أُعيد إرسال رابط التأكيد')).catch(e => toast(AUTH_ERR[e.code] || e.message)); break;
+      case 'access-admin': accessAdmin(); break;
+      case 'acc-ok': { const q = ACC_REQ[id]; if (q) Store.db.ref().update({ ['access/allow/' + emailKey(q.email)]: true, [`access/requests/${id}/st`]: 'ok' }).then(accessAdmin).catch(e => toast(e.message)); break; }
+      case 'acc-no': Store.db.ref(`access/requests/${id}/st`).set('no').then(accessAdmin).catch(e => toast(e.message)); break;
+      case 'acc-forget': Store.db.ref('access/requests/' + id).remove().then(accessAdmin).catch(e => toast(e.message)); break;
+      case 'acc-add': { const e = ($('#acc-new').value || '').trim(); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) { toast('البريد غير صالح'); break; } Store.db.ref('access/allow/' + emailKey(e)).set(true).then(() => { toast('اعتُمد ' + e); accessAdmin(); }).catch(er => toast(er.message)); break; }
+      case 'acc-del': if (confirm('إلغاء اعتماد ' + id.replace(/,/g, '.') + '؟\nلن يستطيع صاحبه فتح التطبيق بعد الآن، وتبقى بياناته محفوظة.')) Store.db.ref('access/allow/' + id).remove().then(accessAdmin).catch(e => toast(e.message)); break;
       case 'google': authAction('google'); break;
       case 'au-in': authAction('in'); break;  // احتياطي، الإرسال يتم عبر النموذج
       case 'au-up': authAction('up'); break;
@@ -2645,7 +2768,7 @@ async function boot() {
     await Promise.all([loadScript(b + 'firebase-auth-compat.js'), loadScript(b + 'firebase-database-compat.js')]);
     firebase.initializeApp(CONFIG.FIREBASE);
     Store.mode = 'firebase'; Store.db = firebase.database();
-    firebase.auth().onAuthStateChanged(u => { if (u) { USER = u; start(); } else { USER = null; renderAuth('in'); } });
+    firebase.auth().onAuthStateChanged(u => { if (u) { USER = u; gate(u); } else { USER = null; renderAuth('in'); } });
   } catch (e) {
     toast('تعذّر تحميل Firebase — يعمل التطبيق محلياً'); Store.mode = 'local'; start();
   }
