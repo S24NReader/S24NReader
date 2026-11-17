@@ -6,6 +6,12 @@
 <title>S24NReader — قارئ الأخبار</title>
 <meta name="description" content="قارئ أخبار وخلاصات RSS عربي: تابع مصادرك في مكان واحد.">
 <meta name="theme-color" content="#0f7b4b">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="S24NReader">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f7b4b'/%3E%3Cpath d='M23.67 13.76Q23.67 15.16 22.63 15.9Q21.6 16.63 19.59 16.63Q17.77 16.63 16.73 15.99Q15.69 15.34 15.39 14.03L17.32 13.71Q17.51 14.46 18.08 14.8Q18.64 15.14 19.65 15.14Q21.73 15.14 21.73 13.88Q21.73 13.47 21.49 13.21Q21.25 12.95 20.82 12.77Q20.38 12.6 19.15 12.35Q18.08 12.1 17.67 11.95Q17.25 11.79 16.91 11.59Q16.57 11.38 16.34 11.09Q16.1 10.8 15.97 10.41Q15.84 10.02 15.84 9.51Q15.84 8.23 16.81 7.54Q17.77 6.86 19.62 6.86Q21.39 6.86 22.27 7.41Q23.16 7.96 23.42 9.24L21.49 9.5Q21.34 8.89 20.89 8.58Q20.43 8.27 19.58 8.27Q17.77 8.27 17.77 9.4Q17.77 9.77 17.97 10.01Q18.16 10.24 18.54 10.41Q18.91 10.57 20.07 10.82Q21.43 11.11 22.02 11.36Q22.61 11.61 22.96 11.93Q23.3 12.26 23.48 12.71Q23.67 13.17 23.67 13.76ZM24.68 16.5V15.19Q25.06 14.37 25.74 13.59Q26.42 12.82 27.46 11.98Q28.46 11.17 28.86 10.64Q29.26 10.11 29.26 9.61Q29.26 8.37 28.02 8.37Q27.41 8.37 27.09 8.7Q26.77 9.02 26.67 9.68L24.77 9.57Q24.93 8.25 25.75 7.55Q26.58 6.86 28 6.86Q29.54 6.86 30.36 7.56Q31.18 8.26 31.18 9.53Q31.18 10.2 30.92 10.74Q30.66 11.27 30.25 11.73Q29.84 12.18 29.33 12.58Q28.83 12.98 28.36 13.36Q27.89 13.74 27.5 14.12Q27.11 14.5 26.92 14.94H31.33V16.5ZM38.22 14.56V16.5H36.42V14.56H32.09V13.14L36.11 7H38.22V13.16H39.49V14.56ZM36.42 10.05Q36.42 9.68 36.44 9.26Q36.46 8.83 36.48 8.71Q36.3 9.09 35.84 9.8L33.64 13.16H36.42ZM46.27 16.5 42.13 9.18Q42.26 10.25 42.26 10.9V16.5H40.49V7H42.76L46.96 14.38Q46.84 13.36 46.84 12.52V7H48.61V16.5Z' fill='%23fff'/%3E%3Cpath d='M28.42 55.5 20.53 42.59H12.18V55.5H5.07V21.5H22.05Q28.13 21.5 31.44 24.12Q34.75 26.74 34.75 31.63Q34.75 35.21 32.72 37.8Q30.69 40.39 27.24 41.21L36.43 55.5ZM27.58 31.92Q27.58 27.03 21.31 27.03H12.18V37.06H21.5Q24.49 37.06 26.03 35.71Q27.58 34.36 27.58 31.92Z' fill='%23FF9A2E'/%3E%3Cpath d='M41.93 31.02a7.98 7.98 0 0 1 7.98 7.98M41.93 24.5a14.5 14.5 0 0 1 14.5 14.5' fill='none' stroke='%23FF9A2E' stroke-width='5' stroke-linecap='round'/%3E%3Ccircle cx='41.93' cy='39' r='3' fill='%23FF9A2E'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -134,6 +140,9 @@ body.feed-dragging .nav-i:hover{background:none}
 .it-flags{display:flex;gap:4px;align-items:center}
 .it-flags .ico{width:14px;height:14px}
 .it-flags .f-pin{color:var(--ac)}
+.offline{position:fixed;bottom:16px;left:12px;right:12px;margin:0 auto;width:fit-content;z-index:60;display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:10px;background:#5b4a12;color:#fff;font-size:13px;box-shadow:var(--shadow)}
+.offline .ico{width:16px;height:16px;flex:none}
+.offline.hidden{display:none}
 .ru-more{margin-bottom:14px}
 .ru-more summary{cursor:pointer}
 .ru-more .hint{font-size:12.5px;color:var(--tx3);line-height:1.6}
@@ -480,12 +489,13 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
 /* الجوال: الشريط يصبح شريطاً سفلياً */
 @media (max-width:760px){
   #app{grid-template-columns:minmax(0,1fr)}
-  .content{padding-bottom:58px}
-  .rail{position:fixed;bottom:0;left:0;right:0;height:58px;flex-direction:row;justify-content:space-around;padding:0 4px;border-left:0;border-top:1px solid var(--line);z-index:35;overflow:visible}
+  .content{padding-bottom:calc(58px + env(safe-area-inset-bottom))}
+  .rail{position:fixed;bottom:0;left:0;right:0;height:calc(58px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom)!important;flex-direction:row;justify-content:space-around;padding:0 4px;border-left:0;border-top:1px solid var(--line);z-index:35;overflow:visible}
   .rail .rl-logo,.rail .rl-sp{display:none}
   .rl{width:46px;height:46px}
   .rl .bdg{top:0;left:0}
-  .side{top:0!important;bottom:58px}
+  .side{top:0!important;bottom:calc(58px + env(safe-area-inset-bottom))}
+  .offline{bottom:calc(66px + env(safe-area-inset-bottom))}
   .main.cards-mode,.main.nopanel{grid-template-columns:minmax(0,1fr)}
   .dash-in{padding:16px 12px 40px}
   .dash-h h1{font-size:20px}
@@ -698,11 +708,17 @@ const Store = {
     if (this.mode === 'local') {
       const d = lsGet(this.key, null); if (d) S = { ...S, ...d };
     } else {
-      const snap = await this.db.ref('users/' + USER.uid).once('value');
-      let d = snap.val() || {};
+      // دون اتصال (أو إن لم يردّ الخادم خلال 8 ثوانٍ): نفتح من النسخة المحفوظة على الجهاز
+      const snap = navigator.onLine && !NET_SLOW ? await withTimeout(this.db.ref('users/' + USER.uid).once('value'), 8000) : TIMEOUT;
+      let d;
+      if (snap === TIMEOUT) {
+        d = await KV.get('snap_' + USER.uid);
+        if (!d) throw new Error('لا يوجد اتصال بالإنترنت، ولم تُحفظ بعد نسخة من حسابك على هذا الجهاز. افتح التطبيق مرة وأنت متصل.');
+        OFFLINE_START = true;
+      } else d = snap.val() || {};
       // أول دخول بحساب فارغ: انقل المصادر والفلاتر من الوضع المحلي إن وُجدت
       const local = lsGet('s24r_state_local', null);
-      if (!d.feeds && local && local.feeds && Object.keys(local.feeds).length) {
+      if (!OFFLINE_START && !d.feeds && local && local.feeds && Object.keys(local.feeds).length) {
         d = clean({ ...local, settings: { ...DEFAULT_SETTINGS, ...(local.settings || {}) } });
         await this.db.ref('users/' + USER.uid).set(d);
         lsSet('s24r_state_local_migrated', local); localStorage.removeItem('s24r_state_local');
@@ -711,14 +727,16 @@ const Store = {
       S.settings = { ...DEFAULT_SETTINGS, ...(d.settings || {}) };
       // مزامنة حية بين الأجهزة
       ['folders', 'feeds', 'rules', 'states', 'saved', 'drafts', 'tags', 'itags', 'notes', 'settings'].forEach(k => {
-        let first = true;
+        // الحدث الأول يطابق ما حُمّل للتو فيُتجاهل؛ أما بعد الفتح من نسخة الجهاز فهو بيانات الخادم عند عودة الاتصال فيُطبَّق
+        let first = !OFFLINE_START;
         this.db.ref(`users/${USER.uid}/${k}`).on('value', s => {
           if (first) { first = false; return; }
           S[k] = s.val() || (k === 'settings' ? { ...DEFAULT_SETTINGS } : {});
           if (k === 'feeds') { /* مصدر أُضيف من جهاز آخر */ Object.keys(S.feeds).forEach(id => { if (!FEED_STATUS[id]) refreshFeed(id); }); }
-          scheduleRender(k);
+          scheduleRender(k); saveSnap();
         });
       });
+      saveSnap();
     }
     S.settings = { ...DEFAULT_SETTINGS, ...(S.settings || {}) };
   },
@@ -728,6 +746,7 @@ const Store = {
     if (this.mode === 'local') this._saveLocal();
     else {
       const m = {}; for (const [p, v] of Object.entries(map)) m[p] = v == null ? null : clean(v);
+      saveSnap(); // التعديل دون اتصال ينتظر في Firebase ويُرسل عند عودة الاتصال، ويُحفظ على الجهاز أيضاً
       return this.db.ref('users/' + USER.uid).update(m).catch(e => toast('تعذّر الحفظ: ' + e.message));
     }
   },
@@ -755,6 +774,34 @@ const IDB = {
   del(k) { if (this.db) this.tx('readwrite').delete(k); },
   clear() { if (this.db) this.tx('readwrite').clear(); },
 };
+/* ---------- العمل دون اتصال ---------- */
+// نسخة من بيانات الحساب على هذا الجهاز (قاعدة منفصلة عن كاش المصادر)، يُفتح بها التطبيق إن لم يكن هناك اتصال
+const KV = {
+  db: null,
+  open() {
+    if (this.db) return Promise.resolve();
+    return new Promise(res => {
+      try {
+        const r = indexedDB.open('s24r-offline', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('kv');
+        r.onsuccess = () => { this.db = r.result; res(); };
+        r.onerror = () => res();
+      } catch { res(); }
+    });
+  },
+  async get(k) { await this.open(); return new Promise(res => { if (!this.db) return res(null); try { const r = this.db.transaction('kv').objectStore('kv').get(k); r.onsuccess = () => res(r.result || null); r.onerror = () => res(null); } catch { res(null); } }); },
+  async put(k, v) { await this.open(); try { if (this.db) this.db.transaction('kv', 'readwrite').objectStore('kv').put(v, k); } catch {} },
+};
+const TIMEOUT = Symbol('timeout');
+const withTimeout = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r(TIMEOUT), ms))]);
+let OFFLINE_START = false;          // فُتح التطبيق من النسخة المحفوظة على الجهاز
+let NET_SLOW = false;               // لم يردّ الخادم على فحص الإذن، فلا ننتظره مرة ثانية عند تحميل البيانات
+const SNAP_KEYS = ['folders', 'feeds', 'rules', 'states', 'saved', 'drafts', 'tags', 'itags', 'notes', 'settings'];
+const saveSnap = debounce(() => {
+  if (Store.mode !== 'firebase' || !USER) return;
+  const o = {}; SNAP_KEYS.forEach(k => { if (S[k]) o[k] = S[k]; });
+  try { KV.put('snap_' + USER.uid, clean(o)); } catch {}
+}, 2500);
 
 /* =========================================================
    الجلب والتحليل
@@ -1077,6 +1124,8 @@ async function refreshFeed(feedId) {
 
 async function refreshAll() {
   if (REFRESHING) return; const ids = Object.keys(S.feeds); if (!ids.length) return;
+  // دون اتصال لا نجرّب الجلب، كي لا تُعلَّم كل المصادر «متوقفة»
+  if (!navigator.onLine) { setOffline(true); return; }
   if (!workerUrl()) { showBanner(); return; }
   REFRESHING = true; $$('.refresh-ico').forEach(e => e.classList.add('spin'));
   const q = [...ids];
@@ -2441,6 +2490,7 @@ function openSettings() {
       <div class="fld"><label>عند فتح المقالة</label><select class="in" id="se-auto"><option value="1">تُعلَّم كمقروءة</option><option value="0">تبقى غير مقروءة</option></select></div></div>
     <div class="row">
       <div class="fld"><label>صفحة البداية</label><select class="in" id="se-start"><option value="dash">لوحة البداية</option><option value="all">كل المقالات</option></select></div><div class="fld"></div></div>
+    <div class="box"><h5>التطبيق على الجهاز</h5><div id="se-install">${installBox()}</div></div>
     <div class="box"><h5>الأخبار المكررة</h5><div style="font-size:13px;color:var(--tx3);margin-bottom:8px">الخبر نفسه من أكثر من مصدر يظهر مرة واحدة، وتحته «نقلته أيضاً» مع بقية المصادر.</div>
       <div class="row">
         <div class="fld"><label>الكشف</label><select class="in" id="se-dup"><option value="strict">صارم (عناوين شبه متطابقة)</option><option value="mid">متوسط (مستحسن)</option><option value="loose">مرن (يجمع أكثر، وقد يخطئ)</option><option value="off">إيقاف</option></select></div>
@@ -2578,10 +2628,18 @@ async function gate(u) {
   if (!u.emailVerified) return gateScreen('verify');
   const db = Store.db, k = emailKey(u.email);
   let adm = false, ok = false, req = null;
+  // آخر إذن ناجح لهذا الحساب على هذا الجهاز: يُعتمد عليه فقط حين لا يوجد اتصال
+  const last = lsGet('s24r_gate', null), lastOk = last && last.uid === u.uid && last.ok;
   try {
-    adm = (await db.ref('access/admins/' + k).once('value')).val() === true;
-    ok = adm || (await db.ref('access/allow/' + k).once('value')).val() === true;
-  } catch (e) { return gateScreen('error', e.message); }
+    const one = path => withTimeout(db.ref(path).once('value'), 7000).then(x => { if (x === TIMEOUT) throw TIMEOUT; return x.val(); });
+    if (!navigator.onLine) throw TIMEOUT;
+    adm = (await one('access/admins/' + k)) === true;
+    ok = adm || (await one('access/allow/' + k)) === true;
+  } catch (e) {
+    if (e === TIMEOUT && lastOk) { NET_SLOW = true; IS_ADMIN = !!last.adm; if (!STARTED) { STARTED = true; start(); } return; }
+    return gateScreen('error', e === TIMEOUT ? 'لا يوجد اتصال بالإنترنت. اتصل مرة واحدة ليُفتح التطبيق، وبعدها يعمل دون اتصال.' : e.message);
+  }
+  lsSet('s24r_gate', ok ? { uid: u.uid, ok: true, adm } : null);
   IS_ADMIN = adm;
   if (ok) {
     if (GATE_REF) { GATE_REF.off(); GATE_REF = null; }
@@ -2862,6 +2920,7 @@ document.addEventListener('click', async e => {
       case 'it-read': KEEP_VIS.add(id); toggleFlag(id, 'r'); break;
       case 'it-later': toggleFlag(id, 'l'); break;
       case 'it-more': itemMenu(t, id); break;
+      case 'install': doInstall(); break;
       case 'dup-open': if (DUP_OPEN.has(id)) DUP_OPEN.delete(id); else DUP_OPEN.add(id); renderList(); break;
       case 'mark-menu': markMenu(t); break;
       case 'open-draft': setView({ type: 'drafts' }, id); break;
@@ -2992,7 +3051,7 @@ const hideBannerIfOk = () => { if (workerUrl()) $('#banner').classList.add('hidd
 async function start() {
   await IDB.open();
   const cached = await IDB.all();
-  await Store.load();
+  try { await Store.load(); } catch (e) { STARTED = false; return gateScreen('error', e.message); }
   for (const c of cached) {
     if (!S.feeds[c.feedId]) { IDB.del(c.feedId); continue; }
     FEED_STATUS[c.feedId] = { fetchedAt: c.fetchedAt, error: '' };
@@ -3002,7 +3061,40 @@ async function start() {
   $('#auth').classList.add('hidden');
   VIEW = { type: setting('start') === 'all' ? 'all' : 'dash' }; SEL = null;
   renderAll(); showBanner(); setupTimer(); pruneStates();
+  setOffline(!navigator.onLine || OFFLINE_START);
   refreshAll();
+}
+/* ---------- حالة الاتصال ---------- */
+function setOffline(on) {
+  let el = $('#offline');
+  if (!el) { el = document.createElement('div'); el.id = 'offline'; el.className = 'offline hidden'; el.innerHTML = `${ico('alert')}<span>غير متصل: تقرأ ما حُفظ على الجهاز، وتعديلاتك تُرسل عند عودة الاتصال</span>`; document.body.appendChild(el); }
+  el.classList.toggle('hidden', !on);
+}
+addEventListener('offline', () => { if (STARTED || Store.mode === 'local') setOffline(true); });
+addEventListener('online', () => {
+  setOffline(false);
+  if (!STARTED) { if (USER) gate(USER); return; } // فُتحت شاشة «لا يوجد اتصال» قبل التشغيل
+  NET_SLOW = false;
+  if (OFFLINE_START) { OFFLINE_START = false; if (USER) USER.getIdToken(true).catch(() => {}); }
+  refreshAll();
+});
+/* ---------- التثبيت على الجهاز (PWA) ---------- */
+let INSTALL_EVT = null;
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); INSTALL_EVT = e; const b = $('#se-install'); if (b) b.innerHTML = installBox(); });
+addEventListener('appinstalled', () => { INSTALL_EVT = null; toast('ثُبّت التطبيق على جهازك'); const b = $('#se-install'); if (b) b.innerHTML = installBox(); });
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+function installBox() {
+  if (isStandalone()) return `<div class="hint">${ico('check')} التطبيق مثبّت، وتستعمله الآن من أيقونته.</div>`;
+  if (INSTALL_EVT) return `<button class="btn pri" data-act="install">${ico('down')}تثبيت التطبيق على هذا الجهاز</button><div class="hint">يظهر بأيقونة على الشاشة، ويُفتح دون شريط المتصفح، ويعمل دون اتصال بما حُفظ عليه.</div>`;
+  if (isIOS()) return `<div class="hint">على الآيفون والآيباد: افتح التطبيق في <b>Safari</b>، واضغط زر <b>المشاركة</b> (مربع يخرج منه سهم)، ثم <b>«إضافة إلى الشاشة الرئيسية»</b>، ثم <b>«إضافة»</b>.</div>`;
+  return `<div class="hint">من قائمة المتصفح (⋮) اختر <b>«تثبيت التطبيق»</b> أو <b>«إضافة إلى الشاشة الرئيسية»</b>. في Chrome على الحاسوب: أيقونة التثبيت في يسار شريط العنوان.</div>`;
+}
+async function doInstall() {
+  if (!INSTALL_EVT) return; const e = INSTALL_EVT; INSTALL_EVT = null;
+  e.prompt(); try { await e.userChoice; } catch {}
+  const b = $('#se-install'); if (b) b.innerHTML = installBox();
 }
 async function boot() {
   applyTheme();
@@ -3015,7 +3107,10 @@ async function boot() {
     Store.mode = 'firebase'; Store.db = firebase.database();
     firebase.auth().onAuthStateChanged(u => { if (u) { USER = u; gate(u); } else { USER = null; renderAuth('in'); } });
   } catch (e) {
-    toast('تعذّر تحميل Firebase — يعمل التطبيق محلياً'); Store.mode = 'local'; start();
+    // لا نفتح «الوضع المحلي» الفارغ (كان يتجاوز إذن الدخول)، بل ننتظر الاتصال
+    const off = !navigator.onLine, a = $('#auth'); a.classList.remove('hidden');
+    a.innerHTML = `<div class="auth-card"><h3 style="margin:0 0 12px;text-align:center">${off ? 'لا يوجد اتصال بالإنترنت' : 'تعذّر الاتصال'}</h3><p class="sub" style="line-height:1.9">${off ? 'افتح التطبيق مرة واحدة وأنت متصل ليُحفظ على هذا الجهاز، وبعدها يعمل دون اتصال. ستُفتح الصفحة تلقائياً عند عودة الاتصال.' : 'تعذّر تحميل خدمة الدخول (Firebase). تأكد من أن الإنترنت يعمل فعلاً على شبكتك، ثم أعد المحاولة.'}</p><button class="btn" onclick="location.reload()">إعادة المحاولة</button></div>`;
+    addEventListener('online', () => location.reload(), { once: true });
   }
 }
 // للاختبار من وحدة التحكم
