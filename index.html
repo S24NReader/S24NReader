@@ -133,6 +133,31 @@ body.feed-dragging .nav-i:hover{background:none}
 .it-th{width:84px;height:64px;border-radius:8px;object-fit:cover;flex:none;background:var(--line2)}
 .it-flags{display:flex;gap:4px;align-items:center}
 .it-flags .ico{width:14px;height:14px}
+.dup-b{display:inline-flex;align-items:center;gap:5px;margin-top:6px;padding:3px 8px;border-radius:7px;font-size:12px;color:var(--tx3);background:var(--line2);max-width:100%}
+.dup-b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dup-b b{color:var(--tx2)}
+.dup-b:hover{color:var(--tx);background:var(--hover)}
+.dup-b .ico{width:13px;height:13px;flex:none}
+.dup-b.open .dn{transform:rotate(90deg)}
+.dupc{display:inline-flex;align-items:center;gap:2px;padding:0 5px;border-radius:6px;background:var(--line2);color:var(--tx2);font-size:11px;font-weight:600}
+.dupc .ico{width:12px;height:12px}
+.dup-list{margin-top:6px;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel)}
+.dup-r{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:7px 10px;font-size:12px;color:var(--tx3);cursor:pointer;border-top:1px solid var(--line2)}
+.dup-r:first-child{border-top:0}
+.dup-r:hover{background:var(--hover)}
+.dup-r img{width:14px;height:14px;border-radius:3px}
+.dup-r .src{color:var(--tx2);font-weight:600}
+.dup-r .t{flex-basis:100%;font-size:13px;line-height:1.5;color:var(--tx2)}
+.dup-r.unread .t{color:var(--tx);font-weight:600}
+.dup-r.cur{background:var(--sel)}
+.dup-r .first,.dup-r .now{padding:0 6px;border-radius:6px;font-size:11px;background:var(--line2);color:var(--tx2)}
+.dup-r .first{background:var(--ac);color:#fff}
+.art-dups{margin:10px 0 4px;font-size:13px}
+.art-dups summary{display:flex;align-items:center;gap:6px;cursor:pointer;list-style:none;color:var(--tx2);padding:6px 10px;border-radius:9px;background:var(--line2);width:fit-content;max-width:100%}
+.art-dups summary::-webkit-details-marker{display:none}
+.art-dups summary span{color:var(--tx3)}
+.art-dups summary .ico{width:14px;height:14px;flex:none}
+.art-dups[open] summary .dn{transform:rotate(90deg)}
 .f-star{color:var(--star)} .f-later{color:var(--later)}
 .chip{font-size:11px;padding:0 7px;border-radius:20px;background:var(--ac2);color:var(--ac3);white-space:nowrap}
 .items.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));grid-auto-rows:auto;gap:14px;padding:14px;align-content:start;align-items:start}
@@ -637,7 +662,7 @@ function toastUndo(msg, undoFn, ms = 10000) {
 const workerUrl = () => (CONFIG.WORKER_URL || lsGet('s24r_worker', '') || '').replace(/\/+$/, '');
 
 /* ---------- الحالة ---------- */
-const DEFAULT_SETTINGS = { theme: 'auto', refreshMin: 15, autoRead: true, view: 'list', listFilter: 'unread', sort: 'new', start: 'dash' };
+const DEFAULT_SETTINGS = { theme: 'auto', refreshMin: 15, autoRead: true, view: 'list', listFilter: 'unread', sort: 'new', start: 'dash', dup: 'mid', dupRead: true, dupPref: '' };
 let S = { folders: {}, feeds: {}, rules: {}, states: {}, saved: {}, drafts: {}, tags: {}, itags: {}, notes: {}, settings: { ...DEFAULT_SETTINGS } };
 const ITEMS = new Map();          // id → مقالة
 const FEED_STATUS = {};           // feedId → {fetchedAt, error, loading}
@@ -1033,7 +1058,7 @@ async function refreshFeed(feedId) {
     });
     const items = [...prevMap.values()].sort((a, b) => b.date - a.date).slice(0, CONFIG.MAX_ITEMS_PER_FEED);
     for (const it of ITEMS.values()) if (it.feedId === feedId) ITEMS.delete(it.id);
-    items.forEach(it => ITEMS.set(it.id, it));
+    items.forEach(it => ITEMS.set(it.id, it)); ITEMS_VER++;
     IDB.put({ feedId, items, fetchedAt: now });
     FEED_STATUS[feedId] = { fetchedAt: now, error: '', loading: false };
     if (fresh.length) applyRuleActions(fresh);
@@ -1057,7 +1082,7 @@ async function refreshAll() {
 /* =========================================================
    القواعد والفلاتر
    ========================================================= */
-const RULE_ACTIONS = { highlight: 'تمييز بلون', star: 'إضافة نجمة', later: 'إضافة إلى القراءة لاحقاً', markread: 'تعليم كمقروء', hide: 'إخفاء' };
+const RULE_ACTIONS = { highlight: 'تمييز بلون', star: 'إضافة نجمة', later: 'إضافة إلى القراءة لاحقاً', markread: 'تعليم كمقروء', hide: 'إخفاء', tag: 'إضافة وسم', draft: 'إرسال إلى المسودات' };
 const RULE_COLORS = ['#d99a00', '#e67e22', '#c2362b', '#d63384', '#8e44ad', '#5b4bd6', '#2f6fd6', '#0aa2c0', '#0f7b4b', '#6aa521', '#795548', '#6c757d'];
 // حقل لون قابل لإعادة الاستخدام في أي مكان: ألوان جاهزة + زر قوس قزح يفتح منتقي ألوان بلا حدود
 function colorField(id, value) {
@@ -1106,8 +1131,8 @@ function matchRules(item) {
   if (!res) { res = rules.filter(r => ruleHit(r, item)); _mr.m.set(item.id, res); }
   return res;
 }
-function applyRuleActions(items) {
-  const upd = {};
+function applyRuleActions(items, opts = {}) {
+  const upd = {}; let drafts = 0;
   for (const it of items) {
     const m = matchRules(it); if (!m.length) continue;
     const st = { ...(S.states[it.id] || {}) }; let changed = false;
@@ -1115,12 +1140,107 @@ function applyRuleActions(items) {
       if (r.action === 'star' && !st.s) { st.s = 1; changed = true; upd['saved/' + it.id] = snapshot(it); }
       if (r.action === 'later' && !st.l) { st.l = 1; changed = true; upd['saved/' + it.id] = snapshot(it); }
       if (r.action === 'markread' && !st.r) { st.r = 1; changed = true; }
+      if (r.action === 'tag' && r.tag && (S.tags || {})[r.tag] && !((S.itags || {})[it.id] || {})[r.tag]) { upd[`itags/${it.id}/${r.tag}`] = 1; upd['saved/' + it.id] = snapshot(it); }
+      // المسودات للأخبار الجديدة فقط، وبحد أقصى 10 في كل تحديث، ومرة واحدة لكل خبر (العلامة dr)
+      if (r.action === 'draft' && !opts.noDraft && !st.dr && drafts < 10) { st.dr = 1; changed = true; drafts++; upd['drafts/' + uid()] = draftFrom(it); }
     }
     if (changed) { st.t = Date.now(); upd['states/' + it.id] = st; }
   }
   if (Object.keys(upd).length) Store.update(upd);
+  if (drafts) toast(`أُرسل ${drafts} خبر إلى المسودات بقاعدة تلقائية`);
 }
 const isHidden = it => matchRules(it).some(r => r.action === 'hide');
+
+/* =========================================================
+   كشف الأخبار المكررة (الخبر نفسه من أكثر من مصدر)
+   ========================================================= */
+// الحد الأدنى لنسبة التشابه بين عنوانين (معامل Dice على الكلمات بعد التطبيع)
+const DUP_LEVELS = { off: 0, strict: .62, mid: .5, loose: .4 };
+const DUP_WIN = 36 * 3600e3;     // لا يُعدّ الخبران نسخة واحدة إن تباعد نشرهما أكثر من 36 ساعة
+const DUP_STOP = new Set(('في من علي الي عن مع بعد قبل حول خلال او ثم ان هذا هذه ذلك تلك التي الذي الذين اللذين كما لا لم لن قد ما هل بين عند منذ حتي ضد عبر دون غير كل '
+  + 'عاجل فيديو بالفيديو صور بالصور شاهد تقرير خاص مباشر بث اليوم امس الان جديد ايضا وفق نحو '
+  + 'the a an of to in on for and or is are at by with from as after over new says video').split(' '));
+const DUP_UP = /(ارتفاع|ارتفع|يرتفع|صعود|يصعد|زياده|قفز|يقفز|تحسن)/, DUP_DN = /(انخفاض|انخفض|ينخفض|تراجع|يتراجع|هبوط|هبط|يهبط|تدهور)/;
+let ITEMS_VER = 0, DUP = { sig: '', of: new Map(), groups: new Map() };
+const DUP_OPEN = new Set();      // المجموعات المفتوحة في القائمة
+function dupToks(title) {
+  const out = new Set();
+  const t = normAr(title).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^\p{L}\p{N}\s]/gu, ' ');
+  for (let w of t.split(/\s+/)) {
+    if (!w || DUP_STOP.has(w)) continue;
+    if (w.length > 4) w = w.replace(/^(وال|بال|فال|كال|لل)/, '');
+    if (w.length > 3) w = w.replace(/^ال/, '');
+    if (w.length > 4) w = w.replace(/(ات|ون|ين|يه|ها)$/, '');
+    if (w.length > 3) w = w.replace(/[هي]$/, '');
+    if (w.length >= 2 && !DUP_STOP.has(w)) out.add(w);
+  }
+  return out;
+}
+// يُبنى مرة واحدة لكل تغيير في المقالات أو الإعداد، ويُعاد استعماله
+function dupIndex() {
+  const lvl = setting('dup'), th = DUP_LEVELS[lvl] || 0, sig = ITEMS_VER + '|' + lvl + '|' + ITEMS.size;
+  if (DUP.sig === sig) return DUP;
+  const of = new Map(), groups = new Map(); DUP = { sig, of, groups };
+  if (!th) return DUP;
+  const items = [...ITEMS.values()].filter(it => S.feeds[it.feedId] && it.title).sort((a, b) => a.date - b.date);
+  const tk = new Map(), df = new Map();
+  for (const it of items) tk.set(it.id, dupToks(it.title));
+  // حرف الجر أو العطف الملتصق (بدمشق، وحلب…) يُحذف إن كانت الكلمة دونه مستعملة في عناوين أخرى
+  const vocab = new Set(); for (const t of tk.values()) t.forEach(w => vocab.add(w));
+  const dir = new Map();
+  for (const it of items) {
+    const t = new Set([...tk.get(it.id)].map(w => w.length >= 5 && /^[وبلفك]/.test(w) && vocab.has(w.slice(1)) ? w.slice(1) : w));
+    tk.set(it.id, t); t.forEach(w => df.set(w, (df.get(w) || 0) + 1));
+    const n = normAr(it.title), up = DUP_UP.test(n), dn = DUP_DN.test(n); dir.set(it.id, up === dn ? 0 : up ? 1 : -1);
+  }
+  // الكلمات الشائعة جداً (مثل «سوريا») لا تصلح دليلاً على التشابه
+  const common = Math.max(6, items.length * .05);
+  for (const it of items) tk.set(it.id, [...tk.get(it.id)].filter(w => df.get(w) <= common));
+  const post = new Map();
+  for (const it of items) {
+    const A = tk.get(it.id);
+    if (A.length >= 3) {
+      const cand = new Map();
+      for (const w of A) for (const j of post.get(w) || []) cand.set(j, (cand.get(j) || 0) + 1);
+      let best = null, bs = 0;
+      for (const [j, n] of cand) {
+        if (n < 3) continue; const b = ITEMS.get(j); if (!b || b.feedId === it.feedId || it.date - b.date > DUP_WIN) continue;
+        if (dir.get(it.id) * dir.get(j) < 0) continue; // «ارتفاع» و«انخفاض» خبران مختلفان
+        const sc = 2 * n / (A.length + tk.get(j).length); if (sc < th || sc <= bs) continue;
+        const g = groups.get(of.get(j)); if (g && g.some(x => x.feedId === it.feedId)) continue; // نسخة واحدة لكل مصدر في المجموعة
+        best = j; bs = sc;
+      }
+      if (best) {
+        let gid = of.get(best); if (!gid) { gid = best; of.set(best, gid); groups.set(gid, [ITEMS.get(best)]); }
+        of.set(it.id, gid); groups.get(gid).push(it);
+      }
+    }
+    for (const w of A) { let l = post.get(w); if (!l) post.set(w, l = []); l.push(it.id); }
+  }
+  return DUP;
+}
+// كل نسخ الخبر (هو منها)، مرتبة من الأقدم نشراً، أو null إن لم يكن مكرراً
+function dupGroup(id) { const d = dupIndex(), g = d.of.get(id); return g ? d.groups.get(g).filter(x => S.feeds[x.feedId]) : null; }
+// يجمع النسخ في القائمة: تبقى نسخة واحدة تمثّل الخبر
+function groupDupes(list) {
+  const d = dupIndex(); if (!d.groups.size) return list;
+  const pref = setting('dupPref'), byG = new Map(), out = [];
+  for (const it of list) {
+    const g = d.of.get(it.id); if (!g) { out.push(it); continue; }
+    let a = byG.get(g); if (!a) { byG.set(g, a = []); out.push(a); } a.push(it);
+  }
+  const rank = x => (x.id === SEL ? 0 : 4) + (pref && x.feedId === pref ? 0 : 2) + (isRead(x.id) ? 1 : 0);
+  return out.map(x => Array.isArray(x) ? x.sort((a, b) => rank(a) - rank(b) || a.date - b.date)[0] : x);
+}
+const dupFeedName = x => (S.feeds[x.feedId] || {}).title || hostOf(x.link);
+function dupRows(group, cur) {
+  const first = group.reduce((a, b) => b.date < a.date ? b : a);
+  return group.map(x => { const f = S.feeds[x.feedId] || {};
+    return `<div class="dup-r${isRead(x.id) ? '' : ' unread'}${x.id === cur ? ' cur' : ''}" data-item="${esc(x.id)}">
+      <img src="${esc(favicon(f.siteUrl || f.url || x.link))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
+      <span class="src">${esc(dupFeedName(x))}</span><span class="tm">${timeAgo(x.date)}</span>${x === first ? '<span class="first">الأول</span>' : ''}${x.id === cur ? '<span class="now">المعروض</span>' : ''}
+      <span class="t">${esc(x.title)}</span></div>`; }).join('');
+}
 
 /* =========================================================
    حالة المقالات
@@ -1135,6 +1255,7 @@ function setFlag(id, flag, on) {
   if (flag === 'l' && !on) { delete s.p; PROG.delete(id); }
   const upd = { ['states/' + id]: Object.keys(s).length > 1 ? s : null };
   if (flag === 's' || flag === 'l') upd['saved/' + id] = (s.s || s.l || hasExtras(id)) ? snapshot(it) : null;
+  if (flag === 'r' && on && setting('dupRead')) for (const x of dupGroup(id) || []) if (x.id !== id && !isRead(x.id)) { upd['states/' + x.id] = { ...st(x.id), r: 1, t: s.t }; KEEP_VIS.add(x.id); }
   Store.update(upd); scheduleRender();
 }
 const toggleFlag = (id, f) => setFlag(id, f, !st(id)[f]);
@@ -1163,12 +1284,15 @@ function feedsInFolder(fid) { const O = f => f.order == null ? 1e15 : f.order; r
 // عدّاد غير المقروء: مرور واحد على كل المقالات لكل رسم
 function unreadCounts() {
   const feed = {}, folder = {}, rule = {}; let total = 0;
+  const D = dupIndex().of, seen = new Set(), once = k => { if (seen.has(k)) return false; seen.add(k); return true; };
   for (const it of ITEMS.values()) {
     const f = S.feeds[it.feedId]; if (!f || isRead(it.id)) continue;
     const m = matchRules(it); m.forEach(r => rule[r.id] = (rule[r.id] || 0) + 1);
     if (m.some(r => r.action === 'hide')) continue;
-    feed[it.feedId] = (feed[it.feedId] || 0) + 1; total++;
-    if (f.folder) { folder[f.folder] = (folder[f.folder] || 0) + 1; const p = parentOf(f.folder); if (p) folder[p] = (folder[p] || 0) + 1; }
+    // الخبر المكرر يُعدّ مرة واحدة في «الكل» وفي كل مجلد
+    const g = D.get(it.id), ok = k => !g || once(k + '|' + g);
+    feed[it.feedId] = (feed[it.feedId] || 0) + 1; if (ok('*')) total++;
+    if (f.folder) { if (ok(f.folder)) folder[f.folder] = (folder[f.folder] || 0) + 1; const p = parentOf(f.folder); if (p && ok(p)) folder[p] = (folder[p] || 0) + 1; }
   }
   return { feed, folder, rule, total };
 }
@@ -1192,6 +1316,7 @@ function currentItems(opts = {}) {
     } else list = list.filter(it => !isHidden(it));
     if (setting('listFilter') === 'unread' && !opts.all) list = list.filter(it => !isRead(it.id) || it.id === SEL || KEEP_VIS.has(it.id));
     list = dedupeByLink(list);
+    if (VIEW.type !== 'feed') list = groupDupes(list);
   }
   if (QUERY) { const q = normAr(QUERY); list = list.filter(it => normAr(it.title + ' ' + (it.text || '')).includes(q)); }
   const dir = setting('sort') === 'old' ? 1 : -1;
@@ -1328,12 +1453,17 @@ function renderList() {
     const chips = m.filter(r => r.action === 'highlight').map(r => `<span class="chip" style="background:${esc(r.color)}22;color:${esc(r.color)}">${esc(r.name)}</span>`).join('');
     const th = it.image ? `<img class="it-th" src="${esc(it.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : '';
     const id = esc(it.id);
+    const dg = VIEW.type !== 'feed' && dupGroup(it.id), others = dg ? dg.filter(x => x.id !== it.id) : [];
+    const gid = others.length ? dupIndex().of.get(it.id) : '', dOpen = gid && DUP_OPEN.has(gid);
+    const dupLine = !others.length ? '' : cards
+      ? `<span class="dupc" title="نقلته أيضاً: ${esc(others.map(dupFeedName).join('، '))}">${ico('copy')}<span dir="ltr">+${others.length}</span></span>`
+      : `<button class="dup-b${dOpen ? ' open' : ''}" data-act="dup-open" data-id="${esc(gid)}">${ico('copy')}<span>نقلته أيضاً: ${esc(others.slice(0, 2).map(dupFeedName).join('، '))}${others.length > 2 ? ` <b dir="ltr">+${others.length - 2}</b>` : ''}</span>${ico('chev', 'dn')}</button>${dOpen ? `<div class="dup-list">${dupRows(dg, it.id)}</div>` : ''}`;
     return `<div class="it${s.r ? '' : ' unread'}${it.id === SEL ? ' sel' : ''}${hl ? ' hl' : ''}" data-item="${id}"${hl ? ` style="--hl:${esc(hl.color)}"` : ''}>${cards ? th : ''}
       <div class="it-main">
         <div class="it-meta"><span class="dot"></span><img src="${esc(favicon(f.siteUrl || f.url || it.link))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"><span class="src">${esc(f.title || hostOf(it.link))}</span><span class="tm">· ${timeAgo(it.date)}</span>
-          <span class="it-flags">${s.s ? ico('star', 'f-star') : ''}${s.l ? ico('clock', 'f-later') : ''}</span>${chips}</div>
+          <span class="it-flags">${s.s ? ico('star', 'f-star') : ''}${s.l ? ico('clock', 'f-later') : ''}</span>${chips}${cards ? dupLine : ''}</div>
         <div class="it-title">${esc(it.title)}</div>
-        ${it.text && !cards ? `<div class="it-snip">${esc(it.text.slice(0, 180))}</div>` : ''}
+        ${it.text && !cards ? `<div class="it-snip">${esc(it.text.slice(0, 180))}</div>` : ''}${cards ? '' : dupLine}
       </div>
       ${cards ? '' : th}
       <div class="it-acts"><span class="it-time">${timeAgo(it.date)}</span><span class="sp"></span>
@@ -1388,7 +1518,7 @@ function _renderReader(r) {
   const body = full && full.html ? full.html : it.html;
   // الصورة الرئيسية تُعرض فقط إن لم يكن في نص المقالة صورة أصلاً (لتجنّب التكرار)
   const lead = /<img\s/i.test(body || '') ? '' : ((full && full.image) || it.image || '');
-  const tg = itemTagIds(it.id), note = (S.notes || {})[it.id], sum = SUMS.get(it.id);
+  const tg = itemTagIds(it.id), note = (S.notes || {})[it.id], sum = SUMS.get(it.id), dg = dupGroup(it.id);
   const u = encodeURIComponent(it.link || ''), t = encodeURIComponent(it.title || '');
   const pr = progOf(it.id);
   r.innerHTML = `<button class="r-x" data-act="close-reader" title="إغلاق (Esc)">${ico('x')}</button>
@@ -1419,6 +1549,7 @@ function _renderReader(r) {
       <div class="art-src"><img src="${esc(favicon(f.siteUrl || f.url || it.link))}" alt="" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"><span>${esc(f.title)}</span></div>
       <h1><a href="${esc(it.link)}" target="_blank" rel="noopener noreferrer">${esc(it.title)}</a></h1>
       <div class="art-meta">${esc(fullDate(it.date))}${it.author ? ' · ' + esc(it.author) : ''} · ${readMinutes(it)} د قراءة</div>
+      ${dg ? `<details class="art-dups"><summary>${ico('copy')}<b>نُشر هذا الخبر في ${dg.length} مصادر</b><span>الأول: ${esc(dupFeedName(dg.reduce((a, b) => b.date < a.date ? b : a)))}</span>${ico('chev', 'dn')}</summary><div class="dup-list">${dupRows(dg, it.id)}</div></details>` : ''}
       ${tg.length ? `<div class="art-tags">${tg.map(tid => `<span class="tagchip" data-view="tag" data-id="${esc(tid)}">${ico('tag')}${esc(S.tags[tid].name)}<button data-act="untag" data-id="${esc(tid)}" title="إزالة الوسم">${ico('x')}</button></span>`).join('')}</div>` : ''}
       ${note ? `<div class="art-note2"><div class="nh">${ico('note')}<b>${esc(note.by || 'ملاحظتي')}</b><span>${esc(fullDate(note.at))}</span><span class="sp"></span><button class="lnk" data-act="note">تعديل</button></div><div class="nt">${esc(note.text)}</div></div>` : ''}
       <div class="sum-row"><button class="btn sm sum-btn${sum && sum.loading ? ' busy' : ''}" data-act="summarize">${ico('spark')}<span>${sum && sum.loading ? 'جارٍ التلخيص…' : sum && sum.text ? 'إخفاء الملخص' : 'تلخيص ذكي'}</span></button></div>
@@ -1722,12 +1853,15 @@ const saveDraft = debounce(() => {
   const s = $('#d-saved'); if (s) s.textContent = 'حُفظت ✓';
   renderSide(); if (VIEW.type === 'drafts') renderDraftList($('#items'));
 }, 600);
-function itemToDraft(it) {
+function draftFrom(it) {
   const f = S.feeds[it.feedId] || {};
   const full = FULLTEXT.get(it.id);
-  const text = plain(full && full.html ? full.html : it.html);
-  const id = uid(); const now = Date.now();
-  Store.write('drafts/' + id, { title: it.title, body: text ? text.slice(0, 6000) + '\n\n' : '', sourceTitle: it.title, sourceUrl: it.link, feedTitle: f.title || it.feedTitle || '', createdAt: now, updatedAt: now });
+  const text = plain(full && full.html ? full.html : it.html); const now = Date.now();
+  return { title: it.title, body: text ? text.slice(0, 6000) + '\n\n' : '', sourceTitle: it.title, sourceUrl: it.link, feedTitle: f.title || it.feedTitle || '', createdAt: now, updatedAt: now };
+}
+function itemToDraft(it) {
+  const id = uid();
+  Store.write('drafts/' + id, draftFrom(it));
   setView({ type: 'drafts' }, id); toast('أُنشئت مسودة من الخبر');
 }
 function draftHtml(d) {
@@ -1818,7 +1952,7 @@ const byDate = (a, b) => b.date - a.date;
 
 function dashWidget(k, UC) {
   if (k === 'latest') {
-    const list = [...ITEMS.values()].filter(it => S.feeds[it.feedId] && !isHidden(it)).sort(byDate).slice(0, 8);
+    const list = groupDupes([...ITEMS.values()].filter(it => S.feeds[it.feedId] && !isHidden(it)).sort(byDate)).slice(0, 8);
     return dwBox(k, ico('inbox'), 'عاجل الآن', UC.total ? `${UC.total} غير مقروء` : '', list.length ? list.map(it => dashRow(it, true)).join('') : `<div class="dw-e">لا أخبار بعد. اضغط تحديث لجلب أحدث المقالات.</div>`, allLink('all'), true);
   }
   if (k === 'later') {
@@ -1906,6 +2040,7 @@ function dashCustomSave() {
 // تعليم مجموعة مقالات كمقروءة مع إمكانية التراجع
 function markRead(list, label) {
   const upd = {}, prev = {}; const now = Date.now();
+  if (setting('dupRead')) { const m = new Map(list.map(it => [it.id, it])); for (const it of list) for (const x of dupGroup(it.id) || []) m.set(x.id, x); list = [...m.values()]; }
   list.forEach(it => { if (!isRead(it.id)) { const k = 'states/' + it.id; prev[k] = S.states[it.id] ? { ...S.states[it.id] } : null; upd[k] = { ...st(it.id), r: 1, t: now }; } });
   const n = Object.keys(upd).length; if (!n) return toast('لا توجد مقالات غير مقروءة هنا');
   Store.update(upd); scheduleRender();
@@ -2069,7 +2204,7 @@ async function feedMenu(anchor, id) {
 }
 function deleteFeed(id) {
   Store.write('feeds/' + id, null); IDB.del(id);
-  for (const it of [...ITEMS.values()]) if (it.feedId === id) ITEMS.delete(it.id);
+  for (const it of [...ITEMS.values()]) if (it.feedId === id) ITEMS.delete(it.id); ITEMS_VER++;
   if (VIEW.type === 'feed' && VIEW.id === id) setView({ type: 'all' }); else renderAll();
 }
 function editFeed(id) {
@@ -2141,7 +2276,7 @@ function openRules() {
       const n = [...ITEMS.values()].filter(it => matchRules(it).some(x => x.id === id)).length;
       return `<div class="rule"><span class="sw" style="background:${esc(r.color || '#999')}"></span><div class="rb"><b>${esc(r.name)}</b>
         <small>${r.negate ? 'لا يحتوي' : 'يحتوي'} ${r.match === 'all' ? 'كل' : 'أياً من'}: ${esc((r.keywords || []).join('، '))}</small>
-        <small>${esc(RULE_ACTIONS[r.action])} · ${esc(scopeLabel(r.scope))} · يطابق الآن ${n} مقالة</small></div>
+        <small>${esc(RULE_ACTIONS[r.action])}${r.action === 'tag' && r.tag && (S.tags || {})[r.tag] ? ': ' + esc(S.tags[r.tag].name) : ''} · ${esc(scopeLabel(r.scope))} · يطابق الآن ${n} مقالة</small></div>
         <label class="toggle"><input type="checkbox" data-rule-toggle data-id="${esc(id)}" ${r.enabled !== false ? 'checked' : ''}><span></span></label>
         <button class="ibtn" data-act="rule-edit" data-id="${esc(id)}">${ico('pen')}</button></div>`;
     }).join('') : `<div class="empty" style="padding:24px">${ico('filter')}<div>لا قواعد بعد. مثال: ميّز بالأحمر كل خبر يذكر «دمشق» أو «حلب».</div></div>`}`,
@@ -2161,12 +2296,16 @@ function editRule(id, preset = {}) {
     <div class="row">
       <div class="fld"><label>النطاق</label><select class="in" id="ru-scope">${scopes}</select></div>
       <div class="fld"><label>الإجراء</label><select class="in" id="ru-action">${Object.entries(RULE_ACTIONS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div></div>
+    <div class="fld" id="ru-tagf"><label>الوسم</label><input class="in" id="ru-tag" list="ru-tags" value="${esc(r.tag && (S.tags || {})[r.tag] ? S.tags[r.tag].name : '')}" placeholder="اختر وسماً أو اكتب اسماً جديداً"><datalist id="ru-tags">${tagsSorted().map(([, t]) => `<option value="${esc(t.name)}">`).join('')}</datalist><div class="hint">يُضاف الوسم تلقائياً إلى كل خبر يطابق القاعدة، وإن لم يكن موجوداً يُنشأ.</div></div>
+    <div class="hint" id="ru-drafth" style="margin:-4px 0 12px;font-size:13px;color:var(--tx3)">تُنشأ مسودة من كل خبر <b>جديد</b> يطابق القاعدة (لا تُنشأ للأخبار الموجودة الآن)، وبحد أقصى 10 مسودات في كل تحديث. اجعل الكلمات دقيقة.</div>
     <div class="fld"><label>اللون</label>${colorField('ru-color', r.color)}<div class="hint">الدائرة الملوّنة الأخيرة تفتح منتقي الألوان لاختيار أي لون تريده.</div></div>
     <div id="ru-prev" class="box"><h5>معاينة</h5><div class="pv" id="ru-pv" style="font-size:13px;color:var(--tx3)">…</div></div>`,
     `<button class="btn pri" data-act="rule-save">حفظ</button><button class="btn" data-act="rules">رجوع</button>${id ? `<span style="flex:1"></span><button class="btn danger" data-act="rule-del">${ico('trash')}حذف</button>` : ''}`, 'lg');
   ov.dataset.id = id || '';
   $('#ru-match').value = r.negate ? 'none' : (r.match || 'any'); $('#ru-field').value = r.field || 'title';
   $('#ru-scope').value = r.scope || 'all'; $('#ru-action').value = r.action || 'highlight';
+  const actUi = () => { const a = $('#ru-action').value; $('#ru-tagf').classList.toggle('hidden', a !== 'tag'); $('#ru-drafth').classList.toggle('hidden', a !== 'draft'); };
+  $('#ru-action').addEventListener('change', actUi); actUi();
   const prev = () => {
     if (!$('#ru-kw')) return; // أُغلقت النافذة قبل انتهاء المهلة
     const t = readRuleForm(); const list = $('#ru-pv'); if (!t.keywords.length) { list.textContent = 'أدخل كلمات لرؤية المقالات المطابقة.'; return; }
@@ -2181,16 +2320,18 @@ function readRuleForm() {
   return {
     name: $('#ru-name').value.trim(), keywords: $('#ru-kw').value.split(/[،,]+/).map(s => s.trim()).filter(Boolean),
     match: m === 'all' ? 'all' : 'any', negate: m === 'none', field: $('#ru-field').value, scope: $('#ru-scope').value,
-    action: $('#ru-action').value, color: $('#ru-color').value || RULE_COLORS[0], enabled: true,
+    action: $('#ru-action').value, color: $('#ru-color').value || RULE_COLORS[0], enabled: true, tagName: $('#ru-tag').value.trim(),
   };
 }
 function saveRule() {
   const id = $('#ov').dataset.id || uid(); const r = readRuleForm();
   if (!r.keywords.length) return toast('أضف كلمة مفتاحية واحدة على الأقل');
+  if (r.action === 'tag') { if (!r.tagName) return toast('اختر الوسم الذي يُضاف'); r.tag = createTag(r.tagName); }
+  delete r.tagName;
   if (!r.name) r.name = r.keywords.slice(0, 2).join('، ');
   if (S.rules[id]) r.enabled = S.rules[id].enabled !== false;
   Store.write('rules/' + id, r);
-  if (r.action !== 'highlight' && r.action !== 'hide') applyRuleActions([...ITEMS.values()].filter(it => !isRead(it.id)));
+  if (r.action !== 'highlight' && r.action !== 'hide' && r.action !== 'draft') setTimeout(() => applyRuleActions([...ITEMS.values()].filter(it => !isRead(it.id)), { noDraft: true }), 50);
   closeModal(); setView({ type: 'rule', id }); toast('تظهر هنا المقالات المطابقة للفلتر');
 }
 
@@ -2205,6 +2346,11 @@ function openSettings() {
       <div class="fld"><label>عند فتح المقالة</label><select class="in" id="se-auto"><option value="1">تُعلَّم كمقروءة</option><option value="0">تبقى غير مقروءة</option></select></div></div>
     <div class="row">
       <div class="fld"><label>صفحة البداية</label><select class="in" id="se-start"><option value="dash">لوحة البداية</option><option value="all">كل المقالات</option></select></div><div class="fld"></div></div>
+    <div class="box"><h5>الأخبار المكررة</h5><div style="font-size:13px;color:var(--tx3);margin-bottom:8px">الخبر نفسه من أكثر من مصدر يظهر مرة واحدة، وتحته «نقلته أيضاً» مع بقية المصادر.</div>
+      <div class="row">
+        <div class="fld"><label>الكشف</label><select class="in" id="se-dup"><option value="strict">صارم (عناوين شبه متطابقة)</option><option value="mid">متوسط (مستحسن)</option><option value="loose">مرن (يجمع أكثر، وقد يخطئ)</option><option value="off">إيقاف</option></select></div>
+        <div class="fld"><label>عند قراءة إحدى النسخ</label><select class="in" id="se-dupread"><option value="1">تُعلَّم بقية النسخ مقروءة</option><option value="0">تبقى بقية النسخ كما هي</option></select></div></div>
+      <div class="fld" style="margin:0"><label>المصدر المفضل</label><select class="in" id="se-duppref"><option value="">لا شيء (تظهر النسخة الأقدم نشراً)</option>${Object.entries(S.feeds).sort((a, b) => (a[1].title || '').localeCompare(b[1].title || '', 'ar')).map(([fid, f]) => `<option value="${esc(fid)}">${esc(f.title || hostOf(f.url))}</option>`).join('')}</select><div class="hint">إن كان بين النسخ خبر من هذا المصدر ظهر هو في القائمة.</div></div></div>
     <div class="box"><h5>استيراد وتصدير</h5><div style="font-size:13px;color:var(--tx3);margin-bottom:8px">OPML هي الصيغة المعيارية لنقل الاشتراكات من Inoreader وFeedly وغيرها.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-act="opml-import">${ico('plus')}استيراد OPML</button><button class="btn sm" data-act="opml-export">${ico('ext')}تصدير OPML</button><button class="btn sm" data-act="json-import">${ico('plus')}استعادة نسخة احتياطية</button><button class="btn sm" data-act="json-export">${ico('doc')}تصدير نسخة احتياطية</button></div>
       <input type="file" id="opml-file" accept=".opml,.xml,text/xml" hidden><input type="file" id="json-file" accept=".json,application/json" hidden>
@@ -2215,12 +2361,13 @@ function openSettings() {
     `<button class="btn pri" data-act="se-save">حفظ</button><button class="btn" data-act="close-modal">إغلاق</button>`, 'lg');
   $('#se-theme').value = setting('theme'); $('#se-ref').value = String(setting('refreshMin'));
   $('#se-sort').value = setting('sort'); $('#se-auto').value = setting('autoRead') ? '1' : '0'; $('#se-start').value = setting('start');
+  $('#se-dup').value = setting('dup'); $('#se-dupread').value = setting('dupRead') ? '1' : '0'; $('#se-duppref').value = S.feeds[setting('dupPref')] ? setting('dupPref') : '';
   $('#opml-file').addEventListener('change', e => importOpml(e.target.files[0]));
   $('#json-file').addEventListener('change', e => importBackup(e.target.files[0]));
 }
 function saveSettings() {
   const w = $('#se-worker'); if (w) lsSet('s24r_worker', w.value.trim());
-  Store.write('settings', { ...S.settings, theme: $('#se-theme').value, refreshMin: Number($('#se-ref').value), sort: $('#se-sort').value, autoRead: $('#se-auto').value === '1', start: $('#se-start').value });
+  Store.write('settings', { ...S.settings, theme: $('#se-theme').value, refreshMin: Number($('#se-ref').value), sort: $('#se-sort').value, autoRead: $('#se-auto').value === '1', start: $('#se-start').value, dup: $('#se-dup').value, dupRead: $('#se-dupread').value === '1', dupPref: $('#se-duppref').value });
   closeModal(); setupTimer(); renderAll(); hideBannerIfOk(); toast('حُفظت الإعدادات');
   if (w && w.value.trim()) refreshAll();
 }
@@ -2620,6 +2767,7 @@ document.addEventListener('click', async e => {
       case 'it-read': KEEP_VIS.add(id); toggleFlag(id, 'r'); break;
       case 'it-later': toggleFlag(id, 'l'); break;
       case 'it-more': itemMenu(t, id); break;
+      case 'dup-open': if (DUP_OPEN.has(id)) DUP_OPEN.delete(id); else DUP_OPEN.add(id); renderList(); break;
       case 'mark-menu': markMenu(t); break;
       case 'open-draft': setView({ type: 'drafts' }, id); break;
       case 'dash-w': dashWMenu(t, t.dataset.k); break;
@@ -2673,7 +2821,7 @@ document.addEventListener('click', async e => {
       case 'opml-export': exportOpml(t); break;
       case 'json-import': $('#json-file').click(); break;
       case 'json-export': download('s24nreader-backup.json', JSON.stringify({ ...S, states: undefined }, null, 2), 'application/json'); break;
-      case 'clear-cache': if (confirm('مسح المقالات المخزّنة مؤقتاً؟ (لن تُحذف مصادرك أو المحفوظات)')) { IDB.clear(); ITEMS.clear(); closeModal(); renderAll(); refreshAll(); } break;
+      case 'clear-cache': if (confirm('مسح المقالات المخزّنة مؤقتاً؟ (لن تُحذف مصادرك أو المحفوظات)')) { IDB.clear(); ITEMS.clear(); ITEMS_VER++; closeModal(); renderAll(); refreshAll(); } break;
       case 'logout': logout(); break;
       case 'gate-out': firebase.auth().signOut().then(() => location.reload()); break;
       case 'gate-check': USER.reload().then(() => USER.getIdToken(true)).then(() => gate(firebase.auth().currentUser)).catch(e => gateScreen('error', e.message)); break;
@@ -2755,6 +2903,7 @@ async function start() {
     FEED_STATUS[c.feedId] = { fetchedAt: c.fetchedAt, error: '' };
     (c.items || []).forEach(it => ITEMS.set(it.id, it));
   }
+  ITEMS_VER++;
   $('#auth').classList.add('hidden');
   VIEW = { type: setting('start') === 'all' ? 'all' : 'dash' }; SEL = null;
   renderAll(); showBanner(); setupTimer(); pruneStates();
