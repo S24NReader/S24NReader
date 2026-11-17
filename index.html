@@ -133,6 +133,10 @@ body.feed-dragging .nav-i:hover{background:none}
 .it-th{width:84px;height:64px;border-radius:8px;object-fit:cover;flex:none;background:var(--line2)}
 .it-flags{display:flex;gap:4px;align-items:center}
 .it-flags .ico{width:14px;height:14px}
+.it-flags .f-pin{color:var(--ac)}
+.ru-more{margin-bottom:14px}
+.ru-more summary{cursor:pointer}
+.ru-more .hint{font-size:12.5px;color:var(--tx3);line-height:1.6}
 .dup-b{display:inline-flex;align-items:center;gap:5px;margin-top:6px;padding:3px 8px;border-radius:7px;font-size:12px;color:var(--tx3);background:var(--line2);max-width:100%}
 .dup-b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dup-b b{color:var(--tx2)}
@@ -531,6 +535,7 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
   <symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></symbol>
   <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></symbol>
   <symbol id="i-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></symbol>
   <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
@@ -1006,7 +1011,7 @@ function dedupeByLink(list) {
   return list.filter(it => { const k = linkKey(it.link); return !k || best.get(k) === it; });
 }
 function ogSave(fid) {
-  clearTimeout(OG_SAVE[fid]);
+  META_VER++; clearTimeout(OG_SAVE[fid]);
   OG_SAVE[fid] = setTimeout(() => IDB.put({ feedId: fid, items: [...ITEMS.values()].filter(i => i.feedId === fid), fetchedAt: (FEED_STATUS[fid] || {}).fetchedAt || Date.now() }), 1500);
 }   
 
@@ -1052,13 +1057,14 @@ async function refreshFeed(feedId) {
         date: isNaN(r.date) ? ((prev && prev.pDate) || firstSeen) : Math.min(r.date, now + 3600e3), firstSeen,
         est: isNaN(r.date) && !(prev && prev.pDate) ? 1 : 0, pDate: prev && prev.pDate, dChk: prev && prev.dChk, dErr: prev && prev.dErr,
         html, text: plain(html).slice(0, 400), image: bigImg(r.image || firstImg(html, r.link || finalUrl)) || (prev && prev.image) || '', noImg: prev && prev.noImg, cats: [...new Set(r.cats || [])],
+        full: prev && prev.full, fErr: prev && prev.fErr,
       };
       if (!prev) fresh.push(item);
       prevMap.set(id, item);
     });
     const items = [...prevMap.values()].sort((a, b) => b.date - a.date).slice(0, CONFIG.MAX_ITEMS_PER_FEED);
     for (const it of ITEMS.values()) if (it.feedId === feedId) ITEMS.delete(it.id);
-    items.forEach(it => ITEMS.set(it.id, it)); ITEMS_VER++;
+    items.forEach(it => { ITEMS.set(it.id, it); if (it.full && !FULLTEXT.has(it.id)) FULLTEXT.set(it.id, it.full); }); ITEMS_VER++;
     IDB.put({ feedId, items, fetchedAt: now });
     FEED_STATUS[feedId] = { fetchedAt: now, error: '', loading: false };
     if (fresh.length) applyRuleActions(fresh);
@@ -1076,13 +1082,16 @@ async function refreshAll() {
   const q = [...ids];
   await Promise.all(Array.from({ length: Math.min(CONFIG.CONCURRENCY, q.length) }, async () => { while (q.length) await refreshFeed(q.shift()); }));
   REFRESHING = false; $$('.refresh-ico').forEach(e => e.classList.remove('spin'));
-  lsSet('s24r_last_refresh', Date.now()); scheduleRender();
+  lsSet('s24r_last_refresh', Date.now());
+  // شرط «نقلته N مصادر» لا يكتمل إلا بعد وصول كل المصادر، فتُعاد القواعد التي فيه على الأخبار الحديثة غير المقروءة
+  if (activeRules().some(r => r.dupMin > 1)) { const since = Date.now() - DUP_WIN; applyRuleActions([...ITEMS.values()].filter(it => S.feeds[it.feedId] && !isRead(it.id) && it.date >= since), { post: true }); }
+  scheduleRender();
 }
 
 /* =========================================================
    القواعد والفلاتر
    ========================================================= */
-const RULE_ACTIONS = { highlight: 'تمييز بلون', star: 'إضافة نجمة', later: 'إضافة إلى القراءة لاحقاً', markread: 'تعليم كمقروء', hide: 'إخفاء', tag: 'إضافة وسم', draft: 'إرسال إلى المسودات' };
+const RULE_ACTIONS = { highlight: 'تمييز بلون', pin: 'تثبيت أعلى القائمة', star: 'إضافة نجمة', later: 'إضافة إلى القراءة لاحقاً', markread: 'تعليم كمقروء', hide: 'إخفاء', tag: 'إضافة وسم', draft: 'إرسال إلى المسودات', full: 'جلب النص الكامل مسبقاً' };
 const RULE_COLORS = ['#d99a00', '#e67e22', '#c2362b', '#d63384', '#8e44ad', '#5b4bd6', '#2f6fd6', '#0aa2c0', '#0f7b4b', '#6aa521', '#795548', '#6c757d'];
 // حقل لون قابل لإعادة الاستخدام في أي مكان: ألوان جاهزة + زر قوس قزح يفتح منتقي ألوان بلا حدود
 function colorField(id, value) {
@@ -1102,12 +1111,25 @@ document.addEventListener('click', e => { const b = e.target.closest('.cpick .sw
 document.addEventListener('input', e => { if (e.target.matches('.cpick input[type=color]')) setColor(e.target.closest('.cpick'), e.target.value, true); });
 let _rulesCache = { v: '', list: [] };
 let _mr = { v: '', m: new Map() };
-const prepRule = (id, r) => ({ id, ...r, kw: (r.keywords || []).map(normAr).filter(Boolean) });
+let META_VER = 0;                 // يزيد حين تتغير صورة خبر أو تاريخه بعد وصوله
+const prepRule = (id, r) => ({ id, ...r, kw: (r.keywords || []).map(normAr).filter(Boolean),
+  au: (r.authors || []).map(normAr).filter(Boolean), ct: (r.cats || []).map(normAr).filter(Boolean), dupMin: +r.dupMin || 0 });
+// القاعدة صالحة إن كان فيها شرط واحد على الأقل: كلمة، أو كاتب، أو تصنيف، أو صورة، أو عدد مصادر، أو نطاق محدد
+const ruleHasCond = r => !!(r.kw.length || r.au.length || r.ct.length || r.img || r.dupMin > 1 || (r.scope && r.scope !== 'all'));
+function ruleCondText(r) {
+  const p = [], kw = r.keywords || [];
+  if (kw.length) p.push(`${r.negate ? 'لا يحتوي' : 'يحتوي'} ${r.match === 'all' ? 'كل' : 'أياً من'}: ${kw.join('، ')}`);
+  if ((r.authors || []).length) p.push('الكاتب: ' + r.authors.join('، '));
+  if ((r.cats || []).length) p.push('التصنيف: ' + r.cats.join('، '));
+  if (r.img === 'yes') p.push('فيه صورة'); if (r.img === 'no') p.push('بلا صورة');
+  if (+r.dupMin > 1) p.push(`نقلته ${+r.dupMin} مصادر أو أكثر`);
+  return p.join(' · ') || 'كل الأخبار';
+}
 function activeRules() {
   // النسخة تشمل مجلدات المصادر لأن نطاق القاعدة قد يكون مجلداً
   const v = JSON.stringify(S.rules || {}) + '|' + Object.entries(S.feeds).map(([k, f]) => k + ':' + (f.folder || '')).join(',') + '|' + Object.entries(S.folders || {}).map(([k, f]) => k + '<' + (f.parent || '')).join(',');
   if (_rulesCache.v !== v) {
-    _rulesCache = { v, list: Object.entries(S.rules || {}).filter(([, r]) => r.enabled !== false && (r.keywords || []).length).map(([id, r]) => prepRule(id, r)) };
+    _rulesCache = { v, list: Object.entries(S.rules || {}).filter(([, r]) => r.enabled !== false).map(([id, r]) => prepRule(id, r)).filter(ruleHasCond) };
   }
   return _rulesCache.list;
 }
@@ -1117,24 +1139,36 @@ function inScope(rule, item) {
   if (sc.startsWith('folder:')) { const f = S.feeds[item.feedId]; return f && inFolder(f.folder, sc.slice(7)); }
   return true;
 }
+// كل الشروط المحددة يجب أن تتحقق معاً (و)، و«لا يحتوي» تخص الكلمات المفتاحية وحدها
 function ruleHit(r, item) {
-  if (!r.kw.length || !inScope(r, item)) return false;
-  const hay = normAr(r.field === 'all' ? item.title + ' ' + (item.text || '') : item.title);
-  const hits = r.kw.map(k => hay.includes(k));
-  const ok = r.match === 'all' ? hits.every(Boolean) : hits.some(Boolean);
-  return r.negate ? !ok : ok;
+  if (!ruleHasCond(r) || !inScope(r, item)) return false;
+  if (r.kw.length) {
+    const hay = normAr(r.field === 'all' ? item.title + ' ' + (item.text || '') : item.title);
+    const hits = r.kw.map(k => hay.includes(k));
+    const ok = r.match === 'all' ? hits.every(Boolean) : hits.some(Boolean);
+    if (r.negate ? ok : !ok) return false;
+  }
+  if (r.au.length) { const a = normAr(item.author || ''); if (!a || !r.au.some(k => a.includes(k))) return false; }
+  if (r.ct.length) { const cs = (item.cats || []).map(normAr); if (!r.ct.some(k => cs.some(c => c.includes(k)))) return false; }
+  if (r.img === 'yes' && !item.image) return false;
+  if (r.img === 'no' && item.image) return false;
+  if (r.dupMin > 1) { const g = dupGroup(item.id); if ((g ? g.length : 1) < r.dupMin) return false; }
+  return true;
 }
 function matchRules(item) {
   const rules = activeRules(); if (!rules.length) return [];
-  if (_mr.v !== _rulesCache.v) _mr = { v: _rulesCache.v, m: new Map() };
+  // شرطا الصورة وعدد المصادر يتغيران بعد وصول الخبر، فتُحسب المطابقة من جديد حين يتغيران
+  const v = _rulesCache.v + (rules.some(r => r.img) ? '|m' + META_VER : '') + (rules.some(r => r.dupMin > 1) ? '|d' + dupIndex().sig : '');
+  if (_mr.v !== v) _mr = { v, m: new Map() };
   let res = _mr.m.get(item.id);
   if (!res) { res = rules.filter(r => ruleHit(r, item)); _mr.m.set(item.id, res); }
   return res;
 }
 function applyRuleActions(items, opts = {}) {
-  const upd = {}; let drafts = 0;
+  const upd = {}; let drafts = 0, fulls = 0;
   for (const it of items) {
-    const m = matchRules(it); if (!m.length) continue;
+    // only: قاعدة واحدة (عند حفظها)، و post: قواعد «عدد المصادر» وحدها (بعد التحديث)
+    const m = matchRules(it).filter(r => (!opts.only || r.id === opts.only) && (!opts.post || r.dupMin > 1)); if (!m.length) continue;
     const st = { ...(S.states[it.id] || {}) }; let changed = false;
     for (const r of m) {
       if (r.action === 'star' && !st.s) { st.s = 1; changed = true; upd['saved/' + it.id] = snapshot(it); }
@@ -1142,7 +1176,9 @@ function applyRuleActions(items, opts = {}) {
       if (r.action === 'markread' && !st.r) { st.r = 1; changed = true; }
       if (r.action === 'tag' && r.tag && (S.tags || {})[r.tag] && !((S.itags || {})[it.id] || {})[r.tag]) { upd[`itags/${it.id}/${r.tag}`] = 1; upd['saved/' + it.id] = snapshot(it); }
       // المسودات للأخبار الجديدة فقط، وبحد أقصى 10 في كل تحديث، ومرة واحدة لكل خبر (العلامة dr)
-      if (r.action === 'draft' && !opts.noDraft && !st.dr && drafts < 10) { st.dr = 1; changed = true; drafts++; upd['drafts/' + uid()] = draftFrom(it); }
+      // في التمرير اللاحق للتحديث: مسودة فقط للخبر الذي وصل بعد إنشاء القاعدة (r.at)
+      if (r.action === 'draft' && !opts.noDraft && !st.dr && drafts < 10 && (!opts.post || (it.firstSeen || 0) >= (r.at || Infinity))) { st.dr = 1; changed = true; drafts++; upd['drafts/' + uid()] = draftFrom(it); }
+      if (r.action === 'full' && fulls < 30 && fullQueue(it)) fulls++;
     }
     if (changed) { st.t = Date.now(); upd['states/' + it.id] = st; }
   }
@@ -1150,6 +1186,38 @@ function applyRuleActions(items, opts = {}) {
   if (drafts) toast(`أُرسل ${drafts} خبر إلى المسودات بقاعدة تلقائية`);
 }
 const isHidden = it => matchRules(it).some(r => r.action === 'hide');
+// التثبيت: يبقى الخبر أعلى القائمة حتى يُقرأ (ويبقى مكانه ما دام مفتوحاً أو ظاهراً بعد قراءته في هذه الصفحة)
+function isPinned(it) {
+  if (isRead(it.id) && it.id !== SEL && !KEEP_VIS.has(it.id)) return false;
+  return (dupGroup(it.id) || [it]).some(x => matchRules(x).some(r => r.action === 'pin'));
+}
+/* ---------- جلب النص الكامل مسبقاً (إجراء قاعدة) ---------- */
+// طابور بخيطين، والنتيجة تُحفظ مع الخبر في IndexedDB (it.full) فلا تضيع بإعادة التحميل
+const FULL_Q = [], FULL_SET = new Set(); let FULL_RUN = 0;
+function fullQueue(it) {
+  if (!it || !it.link || it.full || it.fErr || FULLTEXT.has(it.id) || FULL_SET.has(it.id) || !ITEMS.has(it.id)) return false;
+  FULL_SET.add(it.id); FULL_Q.push(it.id); fullPump(); return true;
+}
+function fullPump() {
+  while (FULL_RUN < 2 && FULL_Q.length) {
+    const id = FULL_Q.shift(); FULL_RUN++;
+    fullFetch(id).finally(() => { FULL_RUN--; FULL_SET.delete(id); fullPump(); });
+  }
+}
+async function fullFetch(id) {
+  const it = ITEMS.get(id); if (!it || it.full || FULLTEXT.has(id)) return;
+  try {
+    const { text, finalUrl } = await fetchText(it.link);
+    const p = parseDoc(text, finalUrl); if (p.kind !== 'html') throw new Error('ليست صفحة مقالة');
+    const res = extractArticle(p.doc, finalUrl);
+    if (!res.html || plain(res.html).length < 150) throw new Error('لم يُعثر على نص المقالة');
+    const x = ITEMS.get(id); if (!x) return;
+    x.full = { html: res.html.slice(0, 60000), image: res.image || '' }; FULLTEXT.set(id, x.full);
+    ogSave(x.feedId); if (SEL === id) renderReader();
+  } catch (e) {
+    const x = ITEMS.get(id); if (x) { x.fErr = 1; ogSave(x.feedId); } // لا يُعاد الجلب التلقائي لهذا الخبر، ويبقى زر «النص الكامل» متاحاً يدوياً
+  }
+}
 
 /* =========================================================
    كشف الأخبار المكررة (الخبر نفسه من أكثر من مصدر)
@@ -1320,7 +1388,9 @@ function currentItems(opts = {}) {
   }
   if (QUERY) { const q = normAr(QUERY); list = list.filter(it => normAr(it.title + ' ' + (it.text || '')).includes(q)); }
   const dir = setting('sort') === 'old' ? 1 : -1;
-  return list.sort((a, b) => dir * (a.date - b.date));
+  if (!['all', 'folder', 'feed', 'rule'].includes(VIEW.type) || !activeRules().some(r => r.action === 'pin')) return list.sort((a, b) => dir * (a.date - b.date));
+  const pin = new Map(list.map(it => [it.id, isPinned(it) ? 1 : 0]));
+  return list.sort((a, b) => (pin.get(b.id) - pin.get(a.id)) || dir * (a.date - b.date));
 }
 
 function viewTitle() {
@@ -1449,6 +1519,7 @@ function renderList() {
   if (!list.length) { box.innerHTML = emptyState(); return; }
   box.innerHTML = list.slice(0, 600).map(it => {
     const f = S.feeds[it.feedId] || { title: it.feedTitle || '' }; const s = st(it.id); const m = matchRules(it);
+    const pinned = ['all', 'folder', 'feed', 'rule'].includes(VIEW.type) && !s.r && isPinned(it);
     const hl = m.find(r => r.action === 'highlight');
     const chips = m.filter(r => r.action === 'highlight').map(r => `<span class="chip" style="background:${esc(r.color)}22;color:${esc(r.color)}">${esc(r.name)}</span>`).join('');
     const th = it.image ? `<img class="it-th" src="${esc(it.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : '';
@@ -1461,7 +1532,7 @@ function renderList() {
     return `<div class="it${s.r ? '' : ' unread'}${it.id === SEL ? ' sel' : ''}${hl ? ' hl' : ''}" data-item="${id}"${hl ? ` style="--hl:${esc(hl.color)}"` : ''}>${cards ? th : ''}
       <div class="it-main">
         <div class="it-meta"><span class="dot"></span><img src="${esc(favicon(f.siteUrl || f.url || it.link))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"><span class="src">${esc(f.title || hostOf(it.link))}</span><span class="tm">· ${timeAgo(it.date)}</span>
-          <span class="it-flags">${s.s ? ico('star', 'f-star') : ''}${s.l ? ico('clock', 'f-later') : ''}</span>${chips}${cards ? dupLine : ''}</div>
+          <span class="it-flags">${pinned ? `<span title="مثبّت حتى تقرأه">${ico('pin', 'f-pin')}</span>` : ''}${s.s ? ico('star', 'f-star') : ''}${s.l ? ico('clock', 'f-later') : ''}</span>${chips}${cards ? dupLine : ''}</div>
         <div class="it-title">${esc(it.title)}</div>
         ${it.text && !cards ? `<div class="it-snip">${esc(it.text.slice(0, 180))}</div>` : ''}${cards ? '' : dupLine}
       </div>
@@ -1911,14 +1982,16 @@ function moveSel(d) {
 
 async function loadFullText(id) {
   const it = getItem(id); if (!it || !it.link) return;
-  if (FULLTEXT.has(id)) { FULLTEXT.delete(id); return renderReader(); }
+  // الضغط مرة ثانية يعيد نص الخلاصة، ويُنسى النص الكامل المحفوظ مع الخبر
+  if (FULLTEXT.has(id)) { FULLTEXT.delete(id); const x = ITEMS.get(id); if (x && x.full) { delete x.full; ogSave(x.feedId); } return renderReader(); }
   toast('جارٍ جلب النص الكامل…', 1500);
   try {
     const { text, finalUrl } = await fetchText(it.link);
     const p = parseDoc(text, finalUrl); if (p.kind !== 'html') throw new Error('ليست صفحة مقالة');
     const res = extractArticle(p.doc, finalUrl);
     if (!res.html || plain(res.html).length < 150) throw new Error('لم يُعثر على نص المقالة في الصفحة');
-    FULLTEXT.set(id, res); if (SEL === id) renderReader();
+    FULLTEXT.set(id, res); const x = ITEMS.get(id); if (x) { x.full = { html: res.html.slice(0, 60000), image: res.image || '' }; delete x.fErr; ogSave(x.feedId); }
+    if (SEL === id) renderReader();
   } catch (e) { toast('تعذّر: ' + e.message, 3500); }
 }
 
@@ -1967,10 +2040,10 @@ function dashWidget(k, UC) {
   if (k.startsWith('rule:')) {
     const rid = k.slice(5), r = S.rules[rid]; if (!r) return '';
     const pr = prepRule(rid, r);
-    const list = pr.kw.length ? [...ITEMS.values()].filter(it => S.feeds[it.feedId] && ruleHit(pr, it)).sort(byDate) : [];
+    const list = ruleHasCond(pr) ? [...ITEMS.values()].filter(it => S.feeds[it.feedId] && ruleHit(pr, it)).sort(byDate) : [];
     const un = list.filter(it => !isRead(it.id)).length;
     return dwBox(k, `<span class="dw-sw" style="background:${esc(r.color || '#999')}"></span>`, esc(r.name), `${list.length} مطابقة${un ? ` · ${un} غير مقروءة` : ''}${r.enabled === false ? ' <span class="dw-off">معطّل</span>' : ''}`,
-      list.length ? list.slice(0, 6).map(it => dashRow(it)).join('') : `<div class="dw-e">لا مقالات تذكر: ${esc((r.keywords || []).join('، ') || '—')}</div>`, allLink('rule', rid));
+      list.length ? list.slice(0, 6).map(it => dashRow(it)).join('') : `<div class="dw-e">لا مقالات مطابقة: ${esc(ruleCondText(r))}</div>`, allLink('rule', rid));
   }
   if (k === 'drafts') {
     const list = draftsSorted().slice(0, 5);
@@ -2271,11 +2344,11 @@ function scopeLabel(sc) {
 function openRules() {
   const rules = Object.entries(S.rules || {});
   modal('القواعد والفلاتر', `
-    <p style="margin:0 0 12px;color:var(--tx2);font-size:14px">القاعدة تراقب المقالات الواردة: إن احتوى العنوان (أو النص) على كلمات معيّنة، تُميَّز أو تُخفى أو تُحفظ تلقائياً. البحث يتجاهل الهمزات والتشكيل.</p>
+    <p style="margin:0 0 12px;color:var(--tx2);font-size:14px">القاعدة تراقب المقالات الواردة: إن تحققت شروطها (كلمات في العنوان أو النص، الكاتب، التصنيف، الصورة، عدد المصادر التي نقلته، المصدر أو المجلد) نُفّذ إجراؤها تلقائياً. البحث يتجاهل الهمزات والتشكيل.</p>
     ${rules.length ? rules.map(([id, r]) => {
       const n = [...ITEMS.values()].filter(it => matchRules(it).some(x => x.id === id)).length;
       return `<div class="rule"><span class="sw" style="background:${esc(r.color || '#999')}"></span><div class="rb"><b>${esc(r.name)}</b>
-        <small>${r.negate ? 'لا يحتوي' : 'يحتوي'} ${r.match === 'all' ? 'كل' : 'أياً من'}: ${esc((r.keywords || []).join('، '))}</small>
+        <small>${esc(ruleCondText(r))}</small>
         <small>${esc(RULE_ACTIONS[r.action])}${r.action === 'tag' && r.tag && (S.tags || {})[r.tag] ? ': ' + esc(S.tags[r.tag].name) : ''} · ${esc(scopeLabel(r.scope))} · يطابق الآن ${n} مقالة</small></div>
         <label class="toggle"><input type="checkbox" data-rule-toggle data-id="${esc(id)}" ${r.enabled !== false ? 'checked' : ''}><span></span></label>
         <button class="ibtn" data-act="rule-edit" data-id="${esc(id)}">${ico('pen')}</button></div>`;
@@ -2289,14 +2362,26 @@ function editRule(id, preset = {}) {
     Object.entries(S.feeds).map(([fid, f]) => `<option value="feed:${esc(fid)}">المصدر: ${esc(f.title)}</option>`).join('');
   const ov = modal(id ? 'تعديل القاعدة' : 'قاعدة جديدة', `
     <div class="fld"><label>اسم القاعدة</label><input class="in" id="ru-name" value="${esc(r.name)}" placeholder="مثال: أخبار الشمال"></div>
-    <div class="fld"><label>الكلمات المفتاحية</label><input class="in" id="ru-kw" value="${esc((r.keywords || []).join('، '))}" placeholder="حلب، إدلب، الرقة"><div class="hint">افصل بين الكلمات بفاصلة (، أو ,). تصلح العبارات أيضاً.</div></div>
+    <div class="fld"><label>الكلمات المفتاحية</label><input class="in" id="ru-kw" value="${esc((r.keywords || []).join('، '))}" placeholder="حلب، إدلب، الرقة"><div class="hint">افصل بين الكلمات بفاصلة (، أو ,). تصلح العبارات أيضاً. يمكن تركها فارغة إن حددت شرطاً إضافياً أو مصدراً أو مجلداً.</div></div>
     <div class="row">
       <div class="fld"><label>الشرط</label><select class="in" id="ru-match"><option value="any">يحتوي أياً منها</option><option value="all">يحتوي كلها</option><option value="none">لا يحتوي أياً منها</option></select></div>
       <div class="fld"><label>أين يُبحث</label><select class="in" id="ru-field"><option value="title">العنوان فقط</option><option value="all">العنوان والنص</option></select></div></div>
     <div class="row">
       <div class="fld"><label>النطاق</label><select class="in" id="ru-scope">${scopes}</select></div>
       <div class="fld"><label>الإجراء</label><select class="in" id="ru-action">${Object.entries(RULE_ACTIONS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div></div>
+    <details class="box ru-more"${(r.authors || []).length || (r.cats || []).length || r.img || +r.dupMin > 1 ? ' open' : ''}><summary><h5 style="display:inline">شروط إضافية (اختيارية)</h5></summary>
+      <div class="hint" style="margin:6px 0 10px">كل شرط تحدده يجب أن يتحقق مع الكلمات المفتاحية. الشرط الفارغ لا يُحسب.</div>
+      <div class="row">
+        <div class="fld"><label>الكاتب</label><input class="in" id="ru-au" list="ru-aul" value="${esc((r.authors || []).join('، '))}" placeholder="اسم كاتب أو أكثر"><datalist id="ru-aul">${ruleSeen('author').map(v => `<option value="${esc(v)}">`).join('')}</datalist></div>
+        <div class="fld"><label>تصنيف الخبر في موقعه (RSS)</label><input class="in" id="ru-ct" list="ru-ctl" value="${esc((r.cats || []).join('، '))}" placeholder="اقتصاد، رياضة"><datalist id="ru-ctl">${ruleSeen('cats').map(v => `<option value="${esc(v)}">`).join('')}</datalist></div></div>
+      <div class="row">
+        <div class="fld"><label>الصورة</label><select class="in" id="ru-img"><option value="">لا يهم</option><option value="yes">فيه صورة</option><option value="no">بلا صورة</option></select></div>
+        <div class="fld"><label>عدد المصادر التي نقلته</label><select class="in" id="ru-dup"><option value="0">لا يهم</option><option value="2">مصدران أو أكثر</option><option value="3">3 مصادر أو أكثر</option><option value="4">4 مصادر أو أكثر</option><option value="5">5 مصادر أو أكثر</option></select></div></div>
+      <div class="hint">يُطابَق الكاتب والتصنيف بالاحتواء ويتجاهلان الهمزات. ليس كل موقع يرسل الكاتب والتصنيف في خلاصته؛ تجدهما في «بيانات المقالة».${setting('dup') === 'off' ? ' <b>تنبيه: كشف المكررات متوقف في الإعدادات، فشرط عدد المصادر لن يتحقق.</b>' : ''}</div>
+    </details>
     <div class="fld" id="ru-tagf"><label>الوسم</label><input class="in" id="ru-tag" list="ru-tags" value="${esc(r.tag && (S.tags || {})[r.tag] ? S.tags[r.tag].name : '')}" placeholder="اختر وسماً أو اكتب اسماً جديداً"><datalist id="ru-tags">${tagsSorted().map(([, t]) => `<option value="${esc(t.name)}">`).join('')}</datalist><div class="hint">يُضاف الوسم تلقائياً إلى كل خبر يطابق القاعدة، وإن لم يكن موجوداً يُنشأ.</div></div>
+    <div class="hint" id="ru-pinh" style="margin:-4px 0 12px;font-size:13px;color:var(--tx3)">يبقى الخبر المطابق في رأس القائمة، مع علامة دبوس، حتى تقرأه، ثم يعود إلى مكانه حسب وقته. يعمل في «كل المقالات» والمجلدات والمصادر وصفحة الفلتر.</div>
+    <div class="hint" id="ru-fullh" style="margin:-4px 0 12px;font-size:13px;color:var(--tx3)">يُجلب النص الكامل للخبر المطابق في الخلفية لحظة وصوله، ويُحفظ معه، فتجده كاملاً حين تفتحه. كل خبر يستهلك طلباً من حصة الخادم، فاجعل القاعدة لمصدر أو كلمات محددة. عند الحفظ يُجلب أيضاً لغير المقروء الموجود الآن (30 خبراً كحد أقصى في كل مرة).</div>
     <div class="hint" id="ru-drafth" style="margin:-4px 0 12px;font-size:13px;color:var(--tx3)">تُنشأ مسودة من كل خبر <b>جديد</b> يطابق القاعدة (لا تُنشأ للأخبار الموجودة الآن)، وبحد أقصى 10 مسودات في كل تحديث. اجعل الكلمات دقيقة.</div>
     <div class="fld"><label>اللون</label>${colorField('ru-color', r.color)}<div class="hint">الدائرة الملوّنة الأخيرة تفتح منتقي الألوان لاختيار أي لون تريده.</div></div>
     <div id="ru-prev" class="box"><h5>معاينة</h5><div class="pv" id="ru-pv" style="font-size:13px;color:var(--tx3)">…</div></div>`,
@@ -2304,16 +2389,24 @@ function editRule(id, preset = {}) {
   ov.dataset.id = id || '';
   $('#ru-match').value = r.negate ? 'none' : (r.match || 'any'); $('#ru-field').value = r.field || 'title';
   $('#ru-scope').value = r.scope || 'all'; $('#ru-action').value = r.action || 'highlight';
-  const actUi = () => { const a = $('#ru-action').value; $('#ru-tagf').classList.toggle('hidden', a !== 'tag'); $('#ru-drafth').classList.toggle('hidden', a !== 'draft'); };
+  $('#ru-img').value = r.img || ''; $('#ru-dup').value = String(+r.dupMin > 1 ? Math.min(+r.dupMin, 5) : 0);
+  const actUi = () => { const a = $('#ru-action').value; $('#ru-tagf').classList.toggle('hidden', a !== 'tag'); $('#ru-drafth').classList.toggle('hidden', a !== 'draft'); $('#ru-pinh').classList.toggle('hidden', a !== 'pin'); $('#ru-fullh').classList.toggle('hidden', a !== 'full'); };
   $('#ru-action').addEventListener('change', actUi); actUi();
   const prev = () => {
     if (!$('#ru-kw')) return; // أُغلقت النافذة قبل انتهاء المهلة
-    const t = readRuleForm(); const list = $('#ru-pv'); if (!t.keywords.length) { list.textContent = 'أدخل كلمات لرؤية المقالات المطابقة.'; return; }
-    const pr = prepRule('__p', t);
+    const t = readRuleForm(); const list = $('#ru-pv'); const pr = prepRule('__p', t);
+    if (!ruleHasCond(pr)) { list.textContent = 'أدخل كلمات أو شرطاً إضافياً أو اختر مصدراً لرؤية المقالات المطابقة.'; return; }
     const m = [...ITEMS.values()].filter(it => ruleHit(pr, it));
     list.innerHTML = m.length ? `<b>${m.length}</b> مقالة تطابق حالياً:<ul style="margin:6px 0 0;padding-inline-start:18px">${m.slice(0, 5).map(it => `<li>${esc(it.title)}</li>`).join('')}</ul>` : 'لا مقالات مطابقة حالياً (ستُطبَّق على الجديد).';
   };
   $$('#ov input, #ov select').forEach(e => e.addEventListener('input', debounce(prev, 200))); prev();
+}
+const splitList = v => v.split(/[،,]+/).map(s => s.trim()).filter(Boolean);
+// قيم الكتّاب أو التصنيفات الموجودة في الأخبار الحالية، للاقتراح في حقول القاعدة
+function ruleSeen(k) {
+  const c = new Map();
+  for (const it of ITEMS.values()) for (const v of (k === 'author' ? [it.author] : it.cats || [])) { const x = (v || '').trim(); if (x && x.length < 60) c.set(x, (c.get(x) || 0) + 1); }
+  return [...c.entries()].sort((a, b) => b[1] - a[1]).slice(0, 60).map(e => e[0]);
 }
 function readRuleForm() {
   const m = $('#ru-match').value;
@@ -2321,17 +2414,19 @@ function readRuleForm() {
     name: $('#ru-name').value.trim(), keywords: $('#ru-kw').value.split(/[،,]+/).map(s => s.trim()).filter(Boolean),
     match: m === 'all' ? 'all' : 'any', negate: m === 'none', field: $('#ru-field').value, scope: $('#ru-scope').value,
     action: $('#ru-action').value, color: $('#ru-color').value || RULE_COLORS[0], enabled: true, tagName: $('#ru-tag').value.trim(),
+    authors: splitList($('#ru-au').value), cats: splitList($('#ru-ct').value), img: $('#ru-img').value, dupMin: +$('#ru-dup').value || 0,
   };
 }
 function saveRule() {
   const id = $('#ov').dataset.id || uid(); const r = readRuleForm();
-  if (!r.keywords.length) return toast('أضف كلمة مفتاحية واحدة على الأقل');
+  if (!ruleHasCond(prepRule(id, r))) return toast('أضف كلمة مفتاحية أو شرطاً إضافياً، أو اختر مصدراً أو مجلداً');
   if (r.action === 'tag') { if (!r.tagName) return toast('اختر الوسم الذي يُضاف'); r.tag = createTag(r.tagName); }
   delete r.tagName;
-  if (!r.name) r.name = r.keywords.slice(0, 2).join('، ');
+  if (!r.name) r.name = r.keywords.length ? r.keywords.slice(0, 2).join('، ') : (r.scope && r.scope !== 'all' ? scopeLabel(r.scope).replace(/^[^:]+: /, '') : ruleCondText(r));
   if (S.rules[id]) r.enabled = S.rules[id].enabled !== false;
+  r.at = (S.rules[id] && S.rules[id].at) || Date.now(); // وقت إنشاء القاعدة: المسودات اللاحقة لا تُنشأ لأخبار أقدم منه
   Store.write('rules/' + id, r);
-  if (r.action !== 'highlight' && r.action !== 'hide' && r.action !== 'draft') setTimeout(() => applyRuleActions([...ITEMS.values()].filter(it => !isRead(it.id)), { noDraft: true }), 50);
+  if (!['highlight', 'hide', 'draft', 'pin'].includes(r.action)) setTimeout(() => applyRuleActions([...ITEMS.values()].filter(it => !isRead(it.id)), { noDraft: true, only: id }), 50);
   closeModal(); setView({ type: 'rule', id }); toast('تظهر هنا المقالات المطابقة للفلتر');
 }
 
@@ -2901,7 +2996,7 @@ async function start() {
   for (const c of cached) {
     if (!S.feeds[c.feedId]) { IDB.del(c.feedId); continue; }
     FEED_STATUS[c.feedId] = { fetchedAt: c.fetchedAt, error: '' };
-    (c.items || []).forEach(it => ITEMS.set(it.id, it));
+    (c.items || []).forEach(it => { ITEMS.set(it.id, it); if (it.full) FULLTEXT.set(it.id, it.full); });
   }
   ITEMS_VER++;
   $('#auth').classList.add('hidden');
