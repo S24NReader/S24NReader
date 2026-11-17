@@ -961,10 +961,11 @@ async function dateFetch(id) {
   const it0 = ITEMS.get(id); if (!it0 || it0.dChk || !it0.link) return;
   let d, fu;
   try { const r = await fetchText(it0.link); fu = r.finalUrl; d = new DOMParser().parseFromString(r.text, 'text/html'); }
-  catch { return; } // خطأ شبكة: نعيد المحاولة في تحديث لاحق
+  catch (e) { const x = ITEMS.get(id); if (x) { x.dErr = 'تعذّر جلب الصفحة: ' + e.message; ogSave(x.feedId); scheduleRender(); } return; } // نعيد المحاولة في تحديث لاحق
   const it = ITEMS.get(id) || it0; it.dChk = 1;
   const t = pageDate(d);
-  if (t) { it.pDate = Math.min(t, Date.now() + 3600e3); it.date = it.pDate; it.est = 0; }
+  if (t) { it.pDate = Math.min(t, Date.now() + 3600e3); it.date = it.pDate; it.est = 0; it.dErr = ''; }
+  else it.dErr = 'لم يُعثر على تاريخ في صفحة المقالة';
   if (!it.image && !it.noImg) { const m = d.querySelector('meta[property="og:image"],meta[name="twitter:image"]'); const img = m ? absUrl(m.getAttribute('content') || '', fu) : ''; if (img) it.image = bigImg(img); }
   ogSave(it.feedId); scheduleRender();
 }
@@ -1024,7 +1025,7 @@ async function refreshFeed(feedId) {
       const item = {
         id, feedId, title: r.title || '(بلا عنوان)', link: r.link, author: r.author || '',
         date: isNaN(r.date) ? ((prev && prev.pDate) || firstSeen) : Math.min(r.date, now + 3600e3), firstSeen,
-        est: isNaN(r.date) && !(prev && prev.pDate) ? 1 : 0, pDate: prev && prev.pDate, dChk: prev && prev.dChk,
+        est: isNaN(r.date) && !(prev && prev.pDate) ? 1 : 0, pDate: prev && prev.pDate, dChk: prev && prev.dChk, dErr: prev && prev.dErr,
         html, text: plain(html).slice(0, 400), image: bigImg(r.image || firstImg(html, r.link || finalUrl)) || (prev && prev.image) || '', noImg: prev && prev.noImg, cats: [...new Set(r.cats || [])],
       };
       if (!prev) fresh.push(item);
@@ -1550,7 +1551,7 @@ function metaModal() {
     ${row('عدد الكلمات', w.toLocaleString('ar'))}
     ${row('تصنيفات RSS', esc((it.cats || []).join('، ')))}
     ${row('اللغة', detectLang((it.title || '') + ' ' + (it.text || '')))}
-    ${row('تاريخ النشر', esc(fullDate(it.date)))}
+    ${row('تاريخ النشر', it.est ? 'غير معروف بعد (المعروض وقت الوصول)' + (it.dErr ? ' — ' + esc(it.dErr) : ' — بانتظار قراءة صفحة المقالة') : esc(fullDate(it.date)))}
     ${it.firstSeen ? row('وصلت إلى القارئ', esc(fullDate(it.firstSeen))) : ''}
     ${row('النص', FULLTEXT.has(it.id) ? 'النص الكامل من الموقع' : (f.type === 'html' ? 'عنوان من صفحة الموقع (بلا RSS)' : 'نص الخلاصة (RSS)'))}
   </div>`, '', 'lg');
