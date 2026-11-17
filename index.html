@@ -308,12 +308,16 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
 .r-bar .ibtn.on{color:var(--ac)}
 .r-share{display:inline-flex;gap:0}
 .r-share .ibtn{color:var(--tx3)} .r-share .ibtn:hover{color:var(--tx)}
-.r-prog{position:relative;width:30px;height:30px;display:inline-grid;place-items:center;margin:0 4px;color:var(--tx3);font-size:9.5px;font-variant-numeric:tabular-nums}
-.r-prog svg{position:absolute;inset:0;transform:rotate(-90deg)}
-.r-prog circle{fill:none;stroke:var(--line);stroke-width:3}
-.r-prog circle.v{stroke:var(--ac);stroke-dasharray:94.25;transition:stroke-dashoffset .2s}
-.r-prog.done{color:var(--ac);font-size:13px}
-.r-prog b{position:relative;font-weight:600;line-height:1;text-box:trim-both cap alphabetic}
+/* دائرة التقدّم: كلها مرسومة داخل SVG بإحداثيات ثابتة، فلا يتأثر موضع الرقم بالخط أو الجهاز */
+.r-prog{position:relative;flex:none;width:30px;height:30px;margin:0 4px;color:var(--tx3)}
+.r-prog svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.r-prog .bg{fill:none;stroke:var(--line);stroke-width:3}
+.r-prog .v{fill:none;stroke:var(--ac);stroke-width:3;stroke-dasharray:94.25;transition:stroke-dashoffset .2s}
+.r-prog text{fill:currentColor;font-size:11.5px;font-weight:600;font-family:inherit}
+.r-prog .ck{fill:none;stroke:var(--ac);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.r-prog .dt{fill:currentColor}
+.r-prog.none{cursor:pointer}
+.r-prog.none .bg{stroke-dasharray:3.2 2.6}
 .art-tags{display:flex;flex-wrap:wrap;gap:6px;margin:-8px 0 16px}
 .tagchip{display:inline-flex;align-items:center;gap:4px;background:var(--ac2);color:var(--ac3);border-radius:20px;padding:2px 6px 2px 10px;font-size:13px;cursor:pointer}
 .tagchip .ico{width:13px;height:13px}
@@ -1244,7 +1248,7 @@ function isPinned(it) {
 // طابور بخيطين، والنتيجة تُحفظ مع الخبر في IndexedDB (it.full) فلا تضيع بإعادة التحميل
 const FULL_Q = [], FULL_SET = new Set(); let FULL_RUN = 0;
 function fullQueue(it) {
-  if (!it || !it.link || it.full || it.fErr || FULLTEXT.has(it.id) || FULL_SET.has(it.id) || !ITEMS.has(it.id)) return false;
+  if (!it || !it.link || it.full || it.fErr || FULLTEXT.has(it.id) || FULL_SET.has(it.id)) return false;
   FULL_SET.add(it.id); FULL_Q.push(it.id); fullPump(); return true;
 }
 function fullPump() {
@@ -1254,15 +1258,14 @@ function fullPump() {
   }
 }
 async function fullFetch(id) {
-  const it = ITEMS.get(id); if (!it || it.full || FULLTEXT.has(id)) return;
+  const it = getItem(id); if (!it || it.full || FULLTEXT.has(id)) return;
+  if (st(id).l || st(id).s) { const f = await KV.get('full_' + id); if (f && f.html) { FULLTEXT.set(id, f); if (SEL === id) renderReader(); return; } }
   try {
     const { text, finalUrl } = await fetchText(it.link);
     const p = parseDoc(text, finalUrl); if (p.kind !== 'html') throw new Error('ليست صفحة مقالة');
     const res = extractArticle(p.doc, finalUrl);
     if (!res.html || plain(res.html).length < 150) throw new Error('لم يُعثر على نص المقالة');
-    const x = ITEMS.get(id); if (!x) return;
-    x.full = { html: res.html.slice(0, 60000), image: res.image || '' }; FULLTEXT.set(id, x.full);
-    ogSave(x.feedId); if (SEL === id) renderReader();
+    fullStore(id, res); if (SEL === id) renderReader();
   } catch (e) {
     const x = ITEMS.get(id); if (x) { x.fErr = 1; ogSave(x.feedId); } // لا يُعاد الجلب التلقائي لهذا الخبر، ويبقى زر «النص الكامل» متاحاً يدوياً
   }
@@ -1374,6 +1377,11 @@ function setFlag(id, flag, on) {
   if (flag === 's' || flag === 'l') upd['saved/' + id] = (s.s || s.l || hasExtras(id)) ? snapshot(it) : null;
   if (flag === 'r' && on && setting('dupRead')) for (const x of dupGroup(id) || []) if (x.id !== id && !isRead(x.id)) { upd['states/' + x.id] = { ...st(x.id), r: 1, t: s.t }; KEEP_VIS.add(x.id); }
   Store.update(upd); scheduleRender();
+  // «لاحقاً» = نية قراءة الخبر كاملاً: يُجلب نصه الكامل فوراً ويُحفظ على الجهاز
+  if ((flag === 'l' || flag === 's') && on) {
+    if (FULLTEXT.has(id)) KV.put('full_' + id, FULLTEXT.get(id));
+    else if (flag === 'l') { const x = ITEMS.get(id) || it; if (x.fErr && !ITEMS.has(id)) delete x.fErr; fullQueue(x); }
+  }
 }
 const toggleFlag = (id, f) => setFlag(id, f, !st(id)[f]);
 // olderMs: تعليم ما هو أقدم من مدة معيّنة فقط (من قائمة السهم بجانب الزر)
@@ -1621,9 +1629,15 @@ function renderReader(force) {
   _lastSig = sig; _lastSel = SEL;
   _renderReader(r);
   r.scrollTop = keepScroll;
-  // مقالة «لاحقاً» قُرئ جزء منها: نعود إلى حيث توقف القارئ
   const pr = SEL ? progOf(SEL) : 0, id = SEL;
-  if (opened && id && st(id).l && pr > .03 && pr < .97) setTimeout(() => { if (SEL === id) r.scrollTop = pr * (r.scrollHeight - r.clientHeight); }, 400);
+  if (opened && id) { PROG_OPEN = { id, t: Date.now() }; fullRestore(id); if (st(id).l) setTimeout(() => { if (SEL === id) progUpdate(false); }, 3100); }
+  if (id && st(id).l) progUpdate(false);
+  // مقالة «لاحقاً» قُرئ جزء منها: نعود إلى السطر الذي توقف عنده القارئ
+  if (opened && id && st(id).l && pr > .03 && pr < .97) setTimeout(() => {
+    if (SEL !== id) return; const b = $('.art-body', r); if (!b) return;
+    const top = b.getBoundingClientRect().top - r.getBoundingClientRect().top + r.scrollTop;
+    r.scrollTop = Math.max(0, top + pr * b.offsetHeight - r.clientHeight * .85);
+  }, 400);
 }
 function _renderReader(r) {
   if (VIEW.type === 'drafts') return renderDraftEditor(r);
@@ -1661,7 +1675,7 @@ function _renderReader(r) {
         <a class="ibtn" href="https://www.facebook.com/sharer/sharer.php?u=${u}" target="_blank" rel="noopener" title="فيسبوك">${ico('fb')}</a>
       </span>
       <button class="ibtn" data-act="share-more" title="مشاركة وحفظ">${ico('share')}</button>
-            ${s.l ? `<span class="r-prog${pr >= .98 ? ' done' : ''}" title="تقدّم القراءة"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/><circle class="v" cx="18" cy="18" r="15" style="stroke-dashoffset:${94.25 * (1 - pr)}"/></svg><b>${pr >= .98 ? '✓' : Math.round(pr * 100)}</b></span>` : ''}
+            ${s.l ? `<span class="r-prog${pr >= .98 ? ' done' : ''}" data-act="prog-ring" title="تقدّم القراءة">${progRing(pr, 'track')}</span>` : ''}
       <button class="btn sm" data-act="fulltext" title="النص الكامل">${ico('doc')}<span class="t">${full ? 'النص الكامل ✓' : 'النص الكامل'}</span></button>
       <a class="btn sm" href="${esc(it.link)}" target="_blank" rel="noopener noreferrer">${ico('ext')}<span class="hide-m">الموقع الأصلي</span></a>
     </div>
@@ -1675,7 +1689,7 @@ function _renderReader(r) {
       <div class="sum-row"><button class="btn sm sum-btn${sum && sum.loading ? ' busy' : ''}" data-act="summarize">${ico('spark')}<span>${sum && sum.loading ? 'جارٍ التلخيص…' : sum && sum.text ? 'إخفاء الملخص' : 'تلخيص ذكي'}</span></button></div>
       ${sum && sum.text && !sum.hidden ? `<div class="sum-box"><div class="sh">${ico('spark')}<b>الملخص الذكي</b><span>مولَّد آلياً، راجعه قبل الاعتماد عليه</span></div>${sumHtml(sum.text)}</div>` : ''}
       ${lead ? `<img class="art-lead" src="${esc(lead)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}
-      <div class="art-body">${body || `<p style="color:var(--tx3)">لا يتضمن المصدر نص المقالة.</p>`}</div>
+      <div class="art-body">${body || `<p class="no-body" style="color:var(--tx3)">لا يتضمن المصدر نص المقالة.</p>`}</div>
       ${!full ? `<div class="art-note">${ico('doc')}<span>هل يبدو النص مختصراً؟ يمكن جلب المقالة كاملة من موقعها.</span><button class="btn sm" data-act="fulltext">جلب النص الكامل</button></div>` : ''}
     </article></div>`;
 }
@@ -1684,6 +1698,62 @@ function _renderReader(r) {
    وحدة المقالة: الوسوم، الملاحظات، البيانات، شكل النص، المشاركة، التلخيص
    ========================================================= */
 const PROG = new Map();   // تقدّم القراءة لكل مقالة (0..1)
+/* التقدّم يُقاس بأسطر نص المقالة: النسبة = الأسطر التي ظهرت على الشاشة ÷ كل أسطر النص.
+   لا يعمل العداد إلا مع نص حقيقي: 3 أسطر على الأقل في جسم المقالة، وليس مقتطفاً مقطوعاً.
+   الأسطر الظاهرة لحظة الفتح لا تُحسب إلا بعد 3 ثوانٍ من بقاء المقالة مفتوحة، أو عند أول تمرير. */
+let PROG_OPEN = { id: null, t: 0 };
+const PROG_SEL = 'p,li,h2,h3,h4,h5,h6,blockquote,pre,td,dd,dt';
+const isCut = t => /(…|\.\.\.|\[\s*(…|\.\.\.)\s*\]|اقرأ المزيد|قراءة المزيد|للمزيد|read more|continue reading)\s*[.»"']?\s*$/i.test((t || '').trim());
+function progLines(r) {
+  const body = $('.art-body', r); if (!body || body.querySelector('.no-body')) return null;
+  let els = [...body.querySelectorAll(PROG_SEL)].filter(e => !e.closest('figure,figcaption') && !e.querySelector(PROG_SEL) && (e.textContent || '').trim().length > 1);
+  if (!els.length && (body.textContent || '').trim()) els = [body];
+  const vb = Math.min(r.getBoundingClientRect().bottom, innerHeight);
+  let total = 0, seen = 0;
+  for (const e of els) {
+    const b = e.getBoundingClientRect(); if (!b.height) continue;
+    const cs = getComputedStyle(e), lh = parseFloat(cs.lineHeight) || (parseFloat(cs.fontSize) || 16) * 1.6;
+    const n = Math.max(1, Math.round(b.height / lh)); total += n;
+    if (b.bottom <= vb + 2) seen += n; else if (b.top < vb) seen += Math.min(n, Math.max(0, Math.floor((vb - b.top) / lh)));
+  }
+  return { total, seen, cut: isCut(body.textContent) && !FULLTEXT.has(SEL) };
+}
+function progRing(p, mode) {
+  const done = mode === 'track' && p >= .98;
+  const mid = mode === 'none' ? '<circle class="dt" cx="12.5" cy="18" r="1.6"/><circle class="dt" cx="18" cy="18" r="1.6"/><circle class="dt" cx="23.5" cy="18" r="1.6"/>'
+    : done ? '<path class="ck" d="M11.5 18.5l4.5 4.5 8.5-9.5"/>'
+    : `<text x="18" y="18" dy="0.35em" text-anchor="middle">${Math.round(p * 100)}</text>`;
+  return `<svg viewBox="0 0 36 36" aria-hidden="true"><circle class="bg" cx="18" cy="18" r="15"/>${mode === 'none' ? '' : `<circle class="v" cx="18" cy="18" r="15" transform="rotate(-90 18 18)" style="stroke-dashoffset:${(94.25 * (1 - p)).toFixed(2)}"/>`}${mid}</svg>`;
+}
+// fromScroll: بعد تمرير فعلي تُحسب الأسطر الظاهرة فوراً؛ وإلا فبعد 3 ثوانٍ من الفتح
+function progUpdate(fromScroll) {
+  const r = $('#reader'), g = $('.r-prog', r), id = SEL; if (!g || !id) return;
+  const L = progLines(r);
+  if (!L || L.total < 3 || L.cut) {
+    g.className = 'r-prog none'; g.title = 'لا يوجد نص كافٍ لحساب التقدّم. اضغط لجلب النص الكامل';
+    g.innerHTML = progRing(0, 'none'); return;
+  }
+  let p = progOf(id);
+  if (fromScroll || (PROG_OPEN.id === id && Date.now() - PROG_OPEN.t >= 3000)) {
+    const q = L.seen >= L.total ? 1 : L.seen / L.total;
+    if (q > p) { p = q; PROG.set(id, p); saveProg(id); }
+  }
+  g.className = 'r-prog' + (p >= .98 ? ' done' : ''); g.title = `تقدّم القراءة: ${Math.round(p * 100)}% من أسطر النص`;
+  g.innerHTML = progRing(p, 'track');
+}
+/* النص الكامل لمقالات «لاحقاً» والنجمة يُحفظ أيضاً على الجهاز (KV)، فيبقى بعد خروج الخبر من الخلاصة ودون اتصال */
+function fullStore(id, res) {
+  const full = { html: (res.html || '').slice(0, 60000), image: res.image || '' };
+  FULLTEXT.set(id, full);
+  const x = ITEMS.get(id); if (x) { x.full = full; delete x.fErr; ogSave(x.feedId); }
+  if (st(id).l || st(id).s) KV.put('full_' + id, full);
+  return full;
+}
+async function fullRestore(id) {
+  if (FULLTEXT.has(id) || !(st(id).l || st(id).s)) return;
+  const f = await KV.get('full_' + id);
+  if (f && f.html && !FULLTEXT.has(id)) { FULLTEXT.set(id, f); if (SEL === id) renderReader(); }
+}
 // التقدّم يُحفظ في الحساب (states/<id>/p) لمقالات «لاحقاً» فقط، فيبقى بعد التحديث وعلى كل الأجهزة
 const progOf = id => Math.max(PROG.get(id) || 0, st(id).p || 0);
 const _progT = {};
@@ -1929,13 +1999,12 @@ async function summarize() {
 }
 
 /* ---------- تقدّم القراءة ---------- */
+let _progRaf = 0;
 $('#reader').addEventListener('scroll', () => {
-    const r = $('#reader'); if (!SEL || VIEW.type === 'drafts' || !st(SEL).l) return;
-  const max = r.scrollHeight - r.clientHeight; if (max <= 20) return; const p = Math.min(1, r.scrollTop / max);
-  if (p <= progOf(SEL)) return; PROG.set(SEL, p); saveProg(SEL);
-  const g = $('.r-prog', r); if (!g) return;
-  $('.v', g).style.strokeDashoffset = 94.25 * (1 - p);
-  g.classList.toggle('done', p >= .98); $('b', g).textContent = p >= .98 ? '✓' : Math.round(p * 100);
+  if (!SEL || VIEW.type === 'drafts' || !st(SEL).l || _progRaf) return;
+  // التمرير في أول نصف ثانية من الفتح يقوم به البرنامج (العودة إلى أعلى أو إلى موضع التوقف)، لا القارئ
+  if (PROG_OPEN.id === SEL && Date.now() - PROG_OPEN.t < 600) return;
+  _progRaf = requestAnimationFrame(() => { _progRaf = 0; progUpdate(true); });
 }, { passive: true });
 // النقر على الخلفية المعتمة يغلق النافذة المنبثقة
 $('#reader').addEventListener('mousedown', e => { if (e.target.id === 'reader' && $('#main').classList.contains('pop')) closeReader(); });
@@ -2032,14 +2101,14 @@ function moveSel(d) {
 async function loadFullText(id) {
   const it = getItem(id); if (!it || !it.link) return;
   // الضغط مرة ثانية يعيد نص الخلاصة، ويُنسى النص الكامل المحفوظ مع الخبر
-  if (FULLTEXT.has(id)) { FULLTEXT.delete(id); const x = ITEMS.get(id); if (x && x.full) { delete x.full; ogSave(x.feedId); } return renderReader(); }
+  if (FULLTEXT.has(id)) { FULLTEXT.delete(id); KV.put('full_' + id, null); const x = ITEMS.get(id); if (x && x.full) { delete x.full; ogSave(x.feedId); } return renderReader(); }
   toast('جارٍ جلب النص الكامل…', 1500);
   try {
     const { text, finalUrl } = await fetchText(it.link);
     const p = parseDoc(text, finalUrl); if (p.kind !== 'html') throw new Error('ليست صفحة مقالة');
     const res = extractArticle(p.doc, finalUrl);
     if (!res.html || plain(res.html).length < 150) throw new Error('لم يُعثر على نص المقالة في الصفحة');
-    FULLTEXT.set(id, res); const x = ITEMS.get(id); if (x) { x.full = { html: res.html.slice(0, 60000), image: res.image || '' }; delete x.fErr; ogSave(x.feedId); }
+    fullStore(id, res);
     if (SEL === id) renderReader();
   } catch (e) { toast('تعذّر: ' + e.message, 3500); }
 }
@@ -2921,6 +2990,7 @@ document.addEventListener('click', async e => {
       case 'it-later': toggleFlag(id, 'l'); break;
       case 'it-more': itemMenu(t, id); break;
       case 'install': doInstall(); break;
+      case 'prog-ring': if (t.classList.contains('none') && SEL) { if (FULLTEXT.has(SEL)) toast('النص الكامل لهذه المقالة قصير جداً لحساب التقدّم', 3500); else loadFullText(SEL); } break;
       case 'dup-open': if (DUP_OPEN.has(id)) DUP_OPEN.delete(id); else DUP_OPEN.add(id); renderList(); break;
       case 'mark-menu': markMenu(t); break;
       case 'open-draft': setView({ type: 'drafts' }, id); break;
@@ -3062,6 +3132,16 @@ async function start() {
   VIEW = { type: setting('start') === 'all' ? 'all' : 'dash' }; SEL = null;
   renderAll(); showBanner(); setupTimer(); pruneStates();
   setOffline(!navigator.onLine || OFFLINE_START);
+  // تنظيف لمرة واحدة: نِسَب قراءة سُجّلت لمقالات بلا نص حقيقي (قبل اعتماد عدّ الأسطر)
+  if (!lsGet('s24r_progfix1', false)) {
+    const upd = {};
+    for (const [id, s] of Object.entries(S.states || {})) if (s && s.p) {
+      const it = getItem(id), t = it ? plain((it.full && it.full.html) || it.html || '') : '';
+      if (!it || (t.match(/\S+/g) || []).length < 25 || isCut(t)) upd[`states/${id}/p`] = null;
+    }
+    if (Object.keys(upd).length) Store.update(upd);
+    lsSet('s24r_progfix1', true);
+  }
   refreshAll();
 }
 /* ---------- حالة الاتصال ---------- */
