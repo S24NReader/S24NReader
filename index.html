@@ -507,6 +507,24 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
   .lh-s{max-width:none}
 }
 @media (max-width:1100px){ .main.nopanel{grid-template-columns:minmax(0,1fr)} }
+/* الحصص اليومية */
+.q-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-top:8px}
+.q-card{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px;border-top:3px solid var(--line)}
+.q-card.ok{border-top-color:var(--ac)}.q-card.warn{border-top-color:#e08a00}.q-card.bad{border-top-color:var(--danger)}
+.q-h{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.q-acc{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--hover);color:var(--tx2);white-space:nowrap;cursor:help}
+.q-acc.official{background:var(--ac2);color:var(--ac3)}.q-acc.live{background:#e6eefb;color:var(--later)}.q-acc.na{opacity:.7}
+.q-n{display:flex;align-items:baseline;gap:4px;font-size:13px;color:var(--tx2)}.q-n b{color:var(--tx);font-size:16px}.q-n .sp{flex:1}
+.q-bar{height:7px;border-radius:5px;background:var(--line2);overflow:hidden}.q-bar i{display:block;height:100%;background:var(--ac);border-radius:5px}
+.q-card.warn .q-bar i{background:#e08a00}.q-card.bad .q-bar i{background:var(--danger)}
+.q-sub{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--tx2)}.q-sub span{flex:1}.q-sub b{color:var(--tx);font-weight:600}
+.q-sub i{font-style:normal;font-size:11px}.q-sub i.warn{color:#e08a00}.q-sub i.bad{color:var(--danger)}
+.q-err{font-size:12px;color:var(--danger);display:flex;gap:4px;align-items:flex-start}.q-err .ico{width:14px;height:14px;flex:none}
+.q-tbl{width:100%;border-collapse:collapse;font-size:13px}.q-tbl th,.q-tbl td{padding:6px 4px;border-top:1px solid var(--line);text-align:start}.q-tbl th{color:var(--tx2);font-weight:600}
+.q-warn{display:flex;align-items:center;gap:8px;width:100%;margin:0 0 12px;padding:10px 12px;border:1px solid #f0c27a;background:#fff6e6;color:#7a4b00;border-radius:10px;font:inherit;font-size:13.5px;cursor:pointer;text-align:start}
+.q-warn .sp{flex:1}.q-warn.bad{border-color:#e9a39c;background:#fdeceb;color:#8c1f16}
+[data-theme="dark"] .q-warn{background:#2e2410;border-color:#5e4718;color:#f2c879}[data-theme="dark"] .q-warn.bad{background:#2f1513;border-color:#6b2a24;color:#f1a49c}
+[data-theme="dark"] .q-acc.live{background:#16233a}
 </style>
 </head>
 <body>
@@ -596,6 +614,7 @@ const CONFIG = {
   // رابط خادم الجلب (Cloudflare Worker) بلا / في النهاية
   WORKER_URL: 'https://s24nreader-proxy.s24nreader.workers.dev',
   AI_URL: 'https://s24nreader-ai.s24nreader.workers.dev',   // خادم التلخيص الذكي (Gemini)
+  STATS_URL: 'https://s24nreader-stats.s24nreader.workers.dev',   // خادم الحصص (للمدير فقط)
   GAS_URL: 'https://script.google.com/macros/s/AKfycbw8_DzpP6jCHdXvOZetYAKke7Dgyf2YrWkqTL-qvSQyxvcmj7tZyvvuiTccOjhwuyS3FA/exec',   // خادم الجلب الاحتياطي (Google Apps Script) للمواقع التي تحجب Cloudflare
   // ضع هنا كائن الإعدادات من Firebase Console لتفعيل الحسابات والمزامنة.
   // إن تُرك null يعمل التطبيق في "وضع محلي" (بيانات هذا المتصفح فقط).
@@ -807,6 +826,32 @@ const saveSnap = debounce(() => {
   try { KV.put('snap_' + USER.uid, clean(o)); } catch {}
 }, 2500);
 
+/* ---------- عدّاد استهلاك هذا الحساب اليومي (يقرؤه المدير في صفحة الحصص) ----------
+   users/<uid>/usage = { em: البريد, d: { 'YYYY-MM-DD' (UTC): { cf, gas, ai } } } — يُرسل مجمّعاً كل 30 ثانية */
+const USE = { q: {}, t: null };
+const utcDay = (t = Date.now()) => new Date(t).toISOString().slice(0, 10);
+function useCount(k, n = 1) {
+  if (Store.mode !== 'firebase' || !USER) return;
+  USE.q[k] = (USE.q[k] || 0) + n;
+  if (!USE.t) USE.t = setTimeout(useFlush, 30000);
+}
+function useFlush() {
+  if (USE.t) { clearTimeout(USE.t); USE.t = null; }
+  if (!USER || !Store.db || !Object.keys(USE.q).length) return;
+  const d = utcDay(), inc = firebase.database.ServerValue.increment, m = { em: USER.email || '' };
+  for (const [k, n] of Object.entries(USE.q)) m[`d/${d}/${k}`] = inc(n);
+  USE.q = {};
+  Store.db.ref(`users/${USER.uid}/usage`).update(m).catch(() => {});
+}
+function usePrune() { // لا يبقى إلا اليوم وأمس
+  if (Store.mode !== 'firebase' || !USER) return;
+  const d = (S.usage && S.usage.d) || {}, keep = [utcDay(), utcDay(Date.now() - 864e5)], m = {};
+  Object.keys(d).forEach(k => { if (!keep.includes(k)) m[k] = null; });
+  if (Object.keys(m).length) Store.db.ref(`users/${USER.uid}/usage/d`).update(m).catch(() => {});
+}
+addEventListener('pagehide', useFlush);
+document.addEventListener('visibilitychange', () => { if (document.hidden) useFlush(); });
+
 /* =========================================================
    الجلب والتحليل
    ========================================================= */
@@ -815,6 +860,7 @@ async function fetchText(url) {
   if (!w) throw new Error('لم يُضبط خادم الجلب بعد (الإعدادات ← خادم الجلب)');
   if (CONFIG.GAS_URL && GAS_HOSTS.has(hostOf(url))) return fetchViaGas(url);
   const r = await fetch(`${w}/fetch?url=${encodeURIComponent(url)}`);
+  useCount('cf');
   if (!r.ok) {
     let j = {}; try { j = await r.json(); } catch {}
     const map = { invalid_url: 'رابط غير صالح', upstream_status: 'الموقع أعاد خطأ ' + (j.status || ''), fetch_failed: 'تعذّر الوصول إلى الموقع', too_large: 'الصفحة كبيرة جداً', unsupported_type: 'نوع محتوى غير مدعوم', origin_not_allowed: 'هذا النطاق غير مسموح في خادم الجلب' };
@@ -831,6 +877,7 @@ async function fetchText(url) {
 const GAS_HOSTS = new Set(lsGet('s24r_gas_hosts', []));
 async function fetchViaGas(url) {
   const r = await fetch(`${CONFIG.GAS_URL}?url=${encodeURIComponent(url)}`);
+  useCount('gas');
   let j = {}; try { j = await r.json(); } catch {}
   if (!j.ok) throw new Error(j.status ? 'الموقع أعاد خطأ ' + j.status : 'تعذّر الوصول إلى الموقع');
   return { text: j.text, finalUrl: url };
@@ -1984,6 +2031,7 @@ async function summarize() {
   }
   SUMS.set(it.id, { loading: true }); renderReader(true);
   try {
+    useCount('ai');
     const r = await fetch(ai + '/summarize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: it.title, text: text.slice(0, 12000), url: it.link }) });
     let j = {}; try { j = await r.json(); } catch {}
     if (!r.ok || !j.summary) {
@@ -2199,7 +2247,7 @@ function renderDash(box) {
       <div class="dash-st"><button data-view="all"><b>${UC.total}</b>غير مقروء</button><button data-view="later"><b>${countSaved('l')}</b>للقراءة لاحقاً</button><button data-act="rail" data-k="drafts"><b>${nd}</b>مسودة</button><button data-act="rail" data-k="feeds"><b>${nf}</b>مصدر</button></div>
       <button class="ibtn" data-act="refresh" title="تحديث (r)"><svg class="ico refresh-ico${REFRESHING ? ' spin' : ''}"><use href="#i-refresh"/></svg></button>
       <button class="btn sm" data-act="dash-custom">${ico('sliders')}تخصيص</button></div>
-    ${keys.length ? `<div class="dash-g">${keys.map(k => dashWidget(k, UC)).join('')}</div>` : `<div class="empty">${ico('home')}<h3>لا مربعات ظاهرة</h3><div>أعد إظهار المربعات من زر «تخصيص».</div></div>`}</div>`;
+    ${quotaWarnHtml()}${keys.length ? `<div class="dash-g">${keys.map(k => dashWidget(k, UC)).join('')}</div>` : `<div class="empty">${ico('home')}<h3>لا مربعات ظاهرة</h3><div>أعد إظهار المربعات من زر «تخصيص».</div></div>`}</div>`;
   box.scrollTop = keep;
 }
 
@@ -2571,7 +2619,7 @@ function openSettings() {
       <div style="font-size:13px;color:var(--tx3);margin-top:10px">OPML ينقل المصادر والمجلدات فقط. النسخة الاحتياطية الكاملة تحفظ أيضاً الفلاتر والوسوم والمحفوظات والمسودات والإعدادات، ولا يقرؤها إلا S24NReader.</div></div>
     ${CONFIG.WORKER_URL ? '' : `<div class="box"><h5>خادم الجلب</h5><div class="fld" style="margin:0"><input class="in ltr" id="se-worker" value="${esc(workerUrl())}" placeholder="https://s24-reader-proxy.xxx.workers.dev"><div class="hint">رابط Cloudflare Worker (انظر دليل التشغيل). يُحفظ في هذا المتصفح فقط؛ للنشر ضعه في CONFIG.WORKER_URL.</div></div></div>`}
     <div class="box"><h5>الحساب</h5><div style="font-size:13px;color:var(--tx2)">${USER ? `مسجّل باسم <b>${esc(USER.email || USER.displayName)}</b> — بياناتك تتزامن بين أجهزتك.` : 'وضع محلي: البيانات محفوظة في هذا المتصفح فقط.'}</div>
-      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">${IS_ADMIN ? `<button class="btn sm pri" data-act="access-admin">${ico('user')}إدارة الوصول</button>` : ''}${USER ? `<button class="btn sm" data-act="logout">تسجيل الخروج</button>` : ''}<button class="btn sm danger" data-act="clear-cache">مسح المقالات المخزّنة</button></div></div>`,
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">${IS_ADMIN ? `<button class="btn sm pri" data-act="access-admin">${ico('user')}إدارة الوصول</button><button class="btn sm" data-act="quota">${ico('alert')}الحصص اليومية</button>` : ''}${USER ? `<button class="btn sm" data-act="logout">تسجيل الخروج</button>` : ''}<button class="btn sm danger" data-act="clear-cache">مسح المقالات المخزّنة</button></div></div>`,
     `<button class="btn pri" data-act="se-save">حفظ</button><button class="btn" data-act="close-modal">إغلاق</button>`, 'lg');
   $('#se-theme').value = setting('theme'); $('#se-ref').value = String(setting('refreshMin'));
   $('#se-sort').value = setting('sort'); $('#se-auto').value = setting('autoRead') ? '1' : '0'; $('#se-start').value = setting('start');
@@ -2712,7 +2760,7 @@ async function gate(u) {
   IS_ADMIN = adm;
   if (ok) {
     if (GATE_REF) { GATE_REF.off(); GATE_REF = null; }
-    if (!STARTED) { STARTED = true; start(); if (adm) watchRequests(); }
+    if (!STARTED) { STARTED = true; start(); if (adm) { watchRequests(); quotaWatch(); } }
     return;
   }
   try {
@@ -2762,6 +2810,78 @@ async function accessAdmin() {
       ${Object.keys(allow).sort().map(k => `<div style="${RS}"><b dir="ltr">${esc(k.replace(/,/g, '.'))}</b><button class="btn sm danger" style="flex:none" data-act="acc-del" data-id="${esc(k)}">إلغاء الاعتماد</button></div>`).join('')}</div>
     ${rej.length ? `<div class="box"><h5>مرفوضون (${rej.length})</h5>${rej.map(([u, q]) => `<div style="${RS}">${who(q)}<span style="display:flex;gap:6px;flex:none"><button class="btn sm" data-act="acc-ok" data-id="${esc(u)}">موافقة</button><button class="btn sm" data-act="acc-forget" data-id="${esc(u)}">حذف الطلب</button></span></div>`).join('')}</div>` : ''}`,
     `<button class="btn" data-act="close-modal">إغلاق</button>`, 'lg');
+}
+/* ---------- الحصص اليومية لكل الخدمات (للمدير فقط، عبر خادم s24nreader-stats) ---------- */
+let QUOTA = null, QUOTA_ERR = '', QUOTA_T = null;
+const qPct = (u, l) => u == null || !l ? null : Math.min(100, Math.round(u / l * 1000) / 10);
+const qLevel = p => p == null ? '' : p >= 90 ? 'bad' : p >= 70 ? 'warn' : 'ok';
+function qFmt(v, unit) {
+  if (v == null || v === '') return '—';
+  if (unit === 'B') { const u = ['B', 'KB', 'MB', 'GB']; let i = 0; v = +v; while (v >= 1024 && i < 3) { v /= 1024; i++; } return `<bdi dir="ltr">${i ? v.toFixed(v < 10 ? 2 : 1) : v} ${u[i]}</bdi>`; }
+  if (unit === 'ts') return fullDate(v);
+  if (unit === 't') return esc(String(v));
+  return Number(v).toLocaleString('en-US');
+}
+function qReset(t) {
+  if (!t) return '';
+  const h = (t - Date.now()) / 3600e3;
+  const o = { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' };
+  if (h > 20) o.weekday = 'short';
+  if (h > 48) { o.day = 'numeric'; o.month = 'short'; }
+  const left = h >= 48 ? Math.round(h / 24) + ' يوم' : h >= 1 ? Math.floor(h) + ' س ' + Math.round((h % 1) * 60) + ' د' : Math.max(1, Math.round(h * 60)) + ' د';
+  return `يُصفَّر ${esc(new Date(t).toLocaleString('ar', o))} بتوقيت إسطنبول (بعد ${left})`;
+}
+async function quotaFetch(fresh) {
+  const u = (CONFIG.STATS_URL || '').replace(/\/+$/, '');
+  if (!u) throw new Error('خادم الحصص لم يُضبط بعد (CONFIG.STATS_URL)');
+  if (!USER) throw new Error('سجّل الدخول أولاً');
+  const tok = await USER.getIdToken();
+  let r;
+  try { r = await fetch(u + '/stats' + (fresh ? '?fresh=1' : ''), { headers: { Authorization: 'Bearer ' + tok } }); }
+  catch { throw new Error('خادم الحصص غير متاح بعد'); }
+  let j = {}; try { j = await r.json(); } catch {}
+  if (!r.ok || !j.ok) throw new Error({ forbidden: 'هذا الحساب ليس مديراً', origin: 'خادم الحصص لا يقبل هذا النطاق', not_configured: 'خادم الحصص لم يُضبط بعد (GCP_SA_KEY)', auth: 'تعذّر التحقق من حسابك، أعد الدخول', google_auth: 'مفتاح حساب الخدمة في Google غير صالح: ' + (j.message || '') }[j.error] || j.message || ('خطأ ' + r.status));
+  QUOTA = j; QUOTA_ERR = ''; return j;
+}
+function quotaWatch() { // قراءة بعد الفتح ثم كل 15 دقيقة والتبويب ظاهر، لتنبيه لوحة البداية
+  const tick = () => { if (document.hidden || !navigator.onLine) return; quotaFetch().then(() => { if ($('.dash-in')) renderList(); }).catch(e => { QUOTA_ERR = e.message; }); };
+  setTimeout(tick, 4000); clearInterval(QUOTA_T); QUOTA_T = setInterval(tick, 15 * 60e3);
+}
+function quotaWarnHtml() {
+  if (!IS_ADMIN || !QUOTA) return '';
+  const hot = QUOTA.items.map(i => ({ i, p: qPct(i.used, i.limit) })).filter(x => x.p != null && x.p >= 70);
+  if (!hot.length) return '';
+  return `<button class="q-warn ${hot.some(x => x.p >= 90) ? 'bad' : ''}" data-act="quota">${ico('alert')}<span>اقتربت حصة: ${hot.map(x => `<b>${esc(x.i.name)}</b> ${x.p}%`).join('، ')}</span><span class="sp"></span>عرض الحصص</button>`;
+}
+function quotaHtml(j) {
+  const ACC = { official: ['رسمي', 'الرقم من الخدمة نفسها'], live: ['حي', 'قراءة لحظية من الخدمة'], counted: ['عدّاد ذاتي', 'نعدّه نحن، قريب من الحقيقي'], na: ['غير متاح', 'الخدمة لا تكشف هذا الرقم'] };
+  const card = i => {
+    const p = qPct(i.used, i.limit), lv = qLevel(p), a = ACC[i.acc] || ACC.na;
+    return `<div class="q-card ${lv}"><div class="q-h"><b>${esc(i.name)}</b><span class="q-acc ${esc(i.acc)}" title="${esc(a[1])}">${a[0]}</span></div>
+      <div class="q-n"><b>${qFmt(i.used, i.unit)}</b> / ${qFmt(i.limit, i.unit)}${p != null ? `<span class="sp"></span><b>${p}%</b>` : ''}</div>
+      <div class="q-bar"><i style="width:${p || 0}%"></i></div>
+      ${i.err ? `<div class="q-err">${ico('alert')}<span>${esc(i.err)}</span></div>` : ''}
+      ${(i.sub || []).filter(x => x.v != null).map(x => { const sp = x.max ? qPct(x.v, x.max) : null; return `<div class="q-sub"><span>${esc(x.l)}</span><b>${qFmt(x.v, x.unit)}${x.max ? ` / ${qFmt(x.max, x.unit)}` : ''}</b>${sp != null ? `<i class="${qLevel(sp)}">${sp}%</i>` : ''}</div>`; }).join('')}
+      <div class="hint">${i.reset ? qReset(i.reset) + '. ' : ''}${esc(i.note || '')}</div></div>`;
+  };
+  const us = (j.users || []).filter(x => !x.more), more = (j.users || []).find(x => x.more);
+  return `<div class="hint">آخر قراءة: ${esc(fullDate(j.at))}${j.memo ? ' (محفوظة من أقل من دقيقة)' : ''}. الألوان: أخضر، برتقالي من 70%، أحمر من 90%.</div>
+    <div class="q-grid">${j.items.map(card).join('')}</div>
+    <div class="box"><h5>الأكثر استهلاكاً اليوم (UTC)</h5>
+      ${us.length ? `<table class="q-tbl"><thead><tr><th>الحساب</th><th>Cloudflare</th><th>Apps Script</th><th>تلخيص</th></tr></thead><tbody>${us.map(x => `<tr><td dir="ltr">${esc(x.email || x.uid)}</td><td>${qFmt(x.cf)}</td><td>${qFmt(x.gas)}</td><td>${qFmt(x.ai)}</td></tr>`).join('')}</tbody></table>` : '<div class="hint">لا استهلاك مسجّل بعد اليوم.</div>'}
+      <div class="hint">يعدّه التطبيق في كل حساب ويرسله كل 30 ثانية، فيمثّل الاستخدام من داخل التطبيق. من يستدعي الخوادم من خارجه لا يظهر هنا، لكنه يظهر في المجموع الرسمي أعلاه.${more ? ` عُرض أول 20 حساباً، وبقي ${more.more}.` : ''}</div></div>`;
+}
+async function quotaOpen(fresh) {
+  const foot = `<button class="btn" data-act="close-modal">إغلاق</button><button class="btn pri" data-act="quota-refresh">${ico('refresh')}تحديث</button>`;
+  const wait = `<div class="empty"><svg class="ico refresh-ico spin"><use href="#i-refresh"/></svg><div>أقرأ الاستهلاك من كل الخدمات…</div></div>`;
+  const ov = modal('الحصص اليومية', QUOTA && !fresh ? quotaHtml(QUOTA) : wait, foot, 'lg');
+  try {
+    const j = await quotaFetch(fresh);
+    if (document.body.contains(ov)) ov.querySelector('.mdl-b').innerHTML = quotaHtml(j);
+    if ($('.dash-in')) renderList();
+  } catch (e) {
+    if (document.body.contains(ov)) ov.querySelector('.mdl-b').innerHTML = `<div class="empty">${ico('alert')}<h3>تعذّرت قراءة الحصص</h3><div>${esc(e.message)}</div></div>`;
+  }
 }
 function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
 
@@ -3051,6 +3171,8 @@ document.addEventListener('click', async e => {
       case 'gate-check': USER.reload().then(() => USER.getIdToken(true)).then(() => gate(firebase.auth().currentUser)).catch(e => gateScreen('error', e.message)); break;
       case 'gate-resend': USER.sendEmailVerification().then(() => toast('أُعيد إرسال رابط التأكيد')).catch(e => toast(AUTH_ERR[e.code] || e.message)); break;
       case 'access-admin': accessAdmin(); break;
+      case 'quota': quotaOpen(); break;
+      case 'quota-refresh': quotaOpen(true); break;
       case 'acc-ok': { const q = ACC_REQ[id]; if (q) Store.db.ref().update({ ['access/allow/' + emailKey(q.email)]: true, [`access/requests/${id}/st`]: 'ok' }).then(accessAdmin).catch(e => toast(e.message)); break; }
       case 'acc-no': Store.db.ref(`access/requests/${id}/st`).set('no').then(accessAdmin).catch(e => toast(e.message)); break;
       case 'acc-forget': Store.db.ref('access/requests/' + id).remove().then(accessAdmin).catch(e => toast(e.message)); break;
@@ -3130,7 +3252,7 @@ async function start() {
   ITEMS_VER++;
   $('#auth').classList.add('hidden');
   VIEW = { type: setting('start') === 'all' ? 'all' : 'dash' }; SEL = null;
-  renderAll(); showBanner(); setupTimer(); pruneStates();
+  renderAll(); showBanner(); setupTimer(); pruneStates(); usePrune();
   setOffline(!navigator.onLine || OFFLINE_START);
   // تنظيف لمرة واحدة: نِسَب قراءة سُجّلت لمقالات بلا نص حقيقي (قبل اعتماد عدّ الأسطر)
   if (!lsGet('s24r_progfix1', false)) {
