@@ -895,13 +895,51 @@ async function fetchViaGas(url) {
 
 const absUrl = (u, base) => { try { const x = new URL(u, base); return /^https?:$/.test(x.protocol) ? x.href : ''; } catch { return ''; } };
 const txt = el => el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '';
-// قراءة التاريخ بتسامح: يصلح صيغاً شائعة الخطأ مثل 2026-11-16T09:17:54:00+0300 (تلفزيون سوريا)
-function parseDateLoose(s) {
-  s = (s || '').trim(); if (!s) return NaN;
-  const t = Date.parse(s); if (!isNaN(t)) return t;
-  s = s.replace(/^(\d{4}-\d\d-\d\d)[ T]+/, '$1T').replace(/(T\d\d:\d\d:\d\d)(?::\d\d)+/, '$1')
-       .replace(/\s*([+-]\d\d):?(\d\d)$/, '$1:$2').replace(/\s*(UTC|GMT)$/i, 'Z');
-  return Date.parse(s);
+// ---------- تاريخ النشر: لحظة مطلقة لا تتأثر بتوقيت الجهاز ولا مكانه ----------
+// إن كتب المصدر فارق التوقيت (+0300، Z، GMT، EEST…) يُؤخذ كما هو. وإن لم يكتبه (09:17 فقط) تُفهم الساعة بتوقيت الموقع نفسه
+// لا بتوقيت الجهاز: يتعلّمه التطبيق تلقائياً لكل موقع، من فارق كتبه الموقع في مكان آخر، أو من أن الخبر لا يُنشر في المستقبل:
+// كل خبر جديد يظهر لأول مرة يعطي حداً أدنى (الساعة المكتوبة − الآن)، وأعلى هذه الحدود مقرّباً إلى نصف ساعة = توقيت الموقع.
+let DATE_HOST = ''; // يُضبط قبل كل قراءة متزامنة (refreshFeed و dateFetch)
+const TZ_DEF = 180, TZ_TOL = 5; // قبل التعلّم: +3 (سوريا وتركيا والخليج)؛ وسماحية 5 دقائق لساعة الموقع
+const TZ_ABBR = { UT: 0, UTC: 0, GMT: 0, WET: 0, WEST: 60, CET: 60, CEST: 120, EET: 120, EEST: 180, TRT: 180, MSK: 180, GST: 240, JST: 540, KST: 540, EST: -300, EDT: -240, CST: -360, CDT: -300, MST: -420, MDT: -360, PST: -480, PDT: -420 };
+const TZL = (() => { try { return JSON.parse(localStorage.getItem('s24r_tz') || '{}'); } catch { return {}; } })();
+const tzSave = debounce(() => { try { localStorage.setItem('s24r_tz', JSON.stringify(TZL)); } catch {} }, 1500);
+const tzClamp = o => Math.max(-720, Math.min(840, o));
+// يعيد { t: لحظة مطلقة، o: الفارق المكتوب بالدقائق } أو { w: الساعة المكتوبة كأنها UTC } إن لم يُكتب فارق
+function readDate(s) {
+  s = (s || '').trim().replace(/^(\d{4}-\d\d-\d\d)[ T]+/, '$1T').replace(/(T\d\d:\d\d:\d\d)(?::\d\d)+/, '$1').replace(/(\d)\s+(Z)$/i, '$1$2');
+  if (!s) return { t: NaN, w: NaN };
+  let o = null, m;
+  if ((m = s.match(/(?:\s|\d)(Z)$/i))) { o = 0; s = s.slice(0, -1); }
+  else if ((m = s.match(/\s*(?:GMT|UTC?)?\s*([+-])(\d\d):?(\d\d)$/i))) { o = (m[1] === '-' ? -1 : 1) * (+m[2] * 60 + +m[3]); s = s.slice(0, m.index); }
+  else if ((m = s.match(/\s*\(?\b([A-Z]{2,5})\)?$/i))) { const k = m[1].toUpperCase(); if (k !== 'AM' && k !== 'PM') { if (TZ_ABBR[k] != null) o = TZ_ABBR[k]; s = s.slice(0, m.index); } }
+  s = s.trim();
+  const w = Date.parse(/^\d{4}-\d\d-\d\d/.test(s) ? (s.includes('T') ? s : s + 'T00:00') + 'Z' : s + ' GMT');
+  if (isNaN(w)) return { t: NaN, w: NaN };
+  return o != null ? { t: w - o * 60e3, o } : { t: NaN, w };
+}
+function tzOff(host) {
+  const h = TZL[host] || {}, ev = Object.values(h.e || {});
+  const floor = ev.length ? Math.ceil((Math.max(...ev) - TZ_TOL) / 30) * 30 : -1e9;
+  if (h.x != null && h.x >= floor) return h.x;  // فارق كتبه الموقع نفسه ولا تناقضه الأخبار
+  if (ev.length >= 4) return tzClamp(floor);    // تعلّم كافٍ من 4 أخبار جديدة أو أكثر
+  return tzClamp(Math.max(h.x ?? h.k ?? TZ_DEF, floor));
+}
+function tzLearn(host, r) {
+  if (!host) return; const h = TZL[host] || (TZL[host] = {});
+  if (!isNaN(r.t)) { if (r.o && h.x !== r.o) { h.x = r.o; tzSave(); } return; } // Z و +00:00 لا يدلان على توقيت الموقع
+  const now = Date.now(), d = Math.round((r.w - now) / 60000);
+  if (d > 900 || h.lw >= r.w) return; // ليس أحدث خبر رأيناه من هذا الموقع
+  h.lw = r.w; if (d < -1440) { tzSave(); return; } // خبر قديم: لا يفيد
+  const e = h.e || (h.e = {}), k = Math.floor(now / 3600e3);
+  for (const x of Object.keys(e)) if (x < k - 72) delete e[x]; // نافذة 3 أيام (تتبع التوقيت الصيفي)
+  if (!(e[k] >= d)) e[k] = d;
+  if (Object.keys(e).length >= 4) h.k = tzOff(host);
+  tzSave();
+}
+function parseDateLoose(s, host = DATE_HOST) {
+  const r = readDate(s); tzLearn(host, r);
+  return !isNaN(r.t) ? r.t : isNaN(r.w) ? NaN : r.w - tzOff(host) * 60e3;
 }
 // تاريخ النشر من صفحة المقالة نفسها (للمواقع التي بلا RSS)
 function pageDate(d) {
@@ -1101,7 +1139,7 @@ async function dateFetch(id) {
   try { const r = await fetchText(it0.link); fu = r.finalUrl; d = new DOMParser().parseFromString(r.text, 'text/html'); }
   catch (e) { const x = ITEMS.get(id); if (x) { x.dErr = 'تعذّر جلب الصفحة: ' + e.message; ogSave(x.feedId); scheduleRender(); } return; } // نعيد المحاولة في تحديث لاحق
   const it = ITEMS.get(id) || it0; it.dChk = 1;
-  const t = pageDate(d);
+  DATE_HOST = hostOf(fu || it0.link); const t = pageDate(d);
   if (t) { it.pDate = Math.min(t, Date.now() + 3600e3); it.date = it.pDate; it.est = 0; it.dErr = ''; }
   else it.dErr = 'لم يُعثر على تاريخ في صفحة المقالة';
   if (!it.image && !it.noImg) { const m = d.querySelector('meta[property="og:image"],meta[name="twitter:image"]'); const img = m ? absUrl(m.getAttribute('content') || '', fu) : ''; if (img) it.image = bigImg(img); }
@@ -1143,7 +1181,7 @@ async function refreshFeed(feedId) {
   const feed = S.feeds[feedId]; if (!feed) return;
   FEED_STATUS[feedId] = { ...(FEED_STATUS[feedId] || {}), loading: true };
   try {
-    const { text, finalUrl } = await fetchText(feed.url);
+    const { text, finalUrl } = await fetchText(feed.url); DATE_HOST = hostOf(finalUrl);
     const p = parseDoc(text, finalUrl);
     let raw;
     if (feed.type !== 'html' && p.kind === 'html') throw new Error('الرابط لا يعيد خلاصة RSS صالحة');
@@ -2835,11 +2873,11 @@ function qFmt(v, unit) {
 function qReset(t) {
   if (!t) return '';
   const h = (t - Date.now()) / 3600e3;
-  const o = { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' };
+  const o = { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' };
   if (h > 20) o.weekday = 'short';
   if (h > 48) { o.day = 'numeric'; o.month = 'short'; }
   const left = h >= 48 ? Math.round(h / 24) + ' يوم' : h >= 1 ? Math.floor(h) + ' س ' + Math.round((h % 1) * 60) + ' د' : Math.max(1, Math.round(h * 60)) + ' د';
-  return `يُصفَّر ${esc(new Date(t).toLocaleString('ar', o))} بتوقيت إسطنبول (بعد ${left})`;
+  return `يُصفَّر ${esc(new Date(t).toLocaleString('ar', o))} بتوقيت جهازك (بعد ${left})`;
 }
 async function quotaFetch(fresh) {
   const u = (CONFIG.STATS_URL || '').replace(/\/+$/, '');
@@ -2877,7 +2915,7 @@ function quotaHtml(j) {
   const us = (j.users || []).filter(x => !x.more), more = (j.users || []).find(x => x.more);
   return `<div class="hint">آخر قراءة: ${esc(fullDate(j.at))}${j.memo ? ' (محفوظة من أقل من دقيقة)' : ''}. الألوان: أخضر، برتقالي من 70%، أحمر من 90%.</div>
     <div class="q-grid">${j.items.map(card).join('')}</div>
-    <div class="box"><h5>الأكثر استهلاكاً اليوم (UTC)</h5>
+    <div class="box"><h5>الأكثر استهلاكاً اليوم (يوم UTC، يبدأ عندك ${esc(new Date(new Date().setUTCHours(0, 0, 0, 0)).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' }))})</h5>
       ${us.length ? `<table class="q-tbl"><thead><tr><th>الحساب</th><th>Cloudflare</th><th>Apps Script</th><th>تلخيص</th><th>مفتوح الآن</th></tr></thead><tbody>${us.map(x => `<tr><td dir="ltr">${esc(x.email || x.uid)}</td><td>${qFmt(x.cf)}</td><td>${qFmt(x.gas)}</td><td>${qFmt(x.ai)}</td><td>${qFmt(x.on || 0)}</td></tr>`).join('')}</tbody></table>` : '<div class="hint">لا استهلاك مسجّل بعد اليوم.</div>'}
       <div class="hint">يعدّه التطبيق في كل حساب ويرسله كل 30 ثانية، فيمثّل الاستخدام من داخل التطبيق. من يستدعي الخوادم من خارجه لا يظهر هنا، لكنه يظهر في المجموع الرسمي أعلاه.${more ? ` عُرض أول 20 حساباً، وبقي ${more.more}.` : ''}</div></div>`;
 }
