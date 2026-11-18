@@ -216,7 +216,7 @@ body.feed-dragging .nav-i:hover{background:none}
 .ed-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--tx3);font-size:13px}
 
 /* ---------- النوافذ ---------- */
-.ov{position:fixed;inset:0;background:rgba(10,15,12,.45);display:grid;place-items:center;z-index:50;padding:16px;animation:fade .12s}
+.ov{position:fixed;inset:0;background:rgba(10,15,12,.45);display:grid;grid-template-columns:minmax(0,1fr);place-items:center;z-index:50;padding:16px;animation:fade .12s}
 @keyframes fade{from{opacity:0}}
 .mdl{background:var(--panel);border-radius:14px;box-shadow:var(--shadow);width:min(560px,100%);max-height:90vh;display:flex;flex-direction:column}
 .mdl.lg{width:min(760px,100%)}
@@ -508,7 +508,7 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
 }
 @media (max-width:1100px){ .main.nopanel{grid-template-columns:minmax(0,1fr)} }
 /* الحصص اليومية */
-.q-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-top:8px}
+.q-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(250px,100%),1fr));gap:10px;margin-top:8px}
 .q-card{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px;border-top:3px solid var(--line)}
 .q-card.ok{border-top-color:var(--ac)}.q-card.warn{border-top-color:#e08a00}.q-card.bad{border-top-color:var(--danger)}
 .q-h{display:flex;justify-content:space-between;align-items:center;gap:6px}
@@ -519,7 +519,7 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
 .q-card.warn .q-bar i{background:#e08a00}.q-card.bad .q-bar i{background:var(--danger)}
 .q-sub{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--tx2)}.q-sub span{flex:1}.q-sub b{color:var(--tx);font-weight:600}
 .q-sub i{font-style:normal;font-size:11px}.q-sub i.warn{color:#e08a00}.q-sub i.bad{color:var(--danger)}
-.q-err{font-size:12px;color:var(--danger);display:flex;gap:4px;align-items:flex-start}.q-err .ico{width:14px;height:14px;flex:none}
+.q-err{font-size:12px;color:var(--danger);display:flex;gap:4px;align-items:flex-start}.q-err .ico{width:14px;height:14px;flex:none} .q-err.bill{color:#9a5b00}[data-theme="dark"] .q-err.bill{color:#e9b45c} .q-tw{overflow-x:auto}.q-em{display:none} @media(max-width:560px){.q-em{display:table-row}.q-em td{padding-bottom:0;font-weight:600;color:var(--tx);overflow-wrap:anywhere}.q-em+tr td{border-top:0}.q-tbl tr>:first-child:not([colspan]){display:none}}
 .q-tbl{width:100%;border-collapse:collapse;font-size:13px}.q-tbl th,.q-tbl td{padding:6px 4px;border-top:1px solid var(--line);text-align:start}.q-tbl th{color:var(--tx2);font-weight:600}
 .q-warn{display:flex;align-items:center;gap:8px;width:100%;margin:0 0 12px;padding:10px 12px;border:1px solid #f0c27a;background:#fff6e6;color:#7a4b00;border-radius:10px;font:inherit;font-size:13.5px;cursor:pointer;text-align:start}
 .q-warn .sp{flex:1}.q-warn.bad{border-color:#e9a39c;background:#fdeceb;color:#8c1f16}
@@ -2908,7 +2908,7 @@ function quotaHtml(j) {
     return `<div class="q-card ${lv}"><div class="q-h"><b>${esc(i.name)}</b><span class="q-acc ${esc(i.acc)}" title="${esc(a[1])}">${a[0]}</span></div>
       <div class="q-n"><b>${qFmt(i.used, i.unit)}</b> / ${qFmt(i.limit, i.unit)}${p != null ? `<span class="sp"></span><b>${p}%</b>` : ''}</div>
       <div class="q-bar"><i style="width:${p || 0}%"></i></div>
-      ${i.err ? `<div class="q-err">${ico('alert')}<span>${esc(i.err)}</span></div>` : ''}
+      ${i.err ? `<div class="q-err${/الفوترة|billing/i.test(i.err) ? ' bill' : ''}">${ico('alert')}<span>${esc(i.err)}</span></div>` : ''}
       ${(i.sub || []).filter(x => x.v != null).map(x => { const sp = x.max ? qPct(x.v, x.max) : null; return `<div class="q-sub"><span>${esc(x.l)}</span><b>${qFmt(x.v, x.unit)}${x.max ? ` / ${qFmt(x.max, x.unit)}` : ''}</b>${sp != null ? `<i class="${qLevel(sp)}">${sp}%</i>` : ''}</div>`; }).join('')}
       <div class="hint">${i.reset ? qReset(i.reset) + '. ' : ''}${esc(i.note || '')}</div></div>`;
   };
@@ -2916,7 +2916,7 @@ function quotaHtml(j) {
   return `<div class="hint">آخر قراءة: ${esc(fullDate(j.at))}${j.memo ? ' (محفوظة من أقل من دقيقة)' : ''}. الألوان: أخضر، برتقالي من 70%، أحمر من 90%.</div>
     <div class="q-grid">${j.items.map(card).join('')}</div>
     <div class="box"><h5>الأكثر استهلاكاً اليوم (يوم UTC، يبدأ عندك ${esc(new Date(new Date().setUTCHours(0, 0, 0, 0)).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' }))})</h5>
-      ${us.length ? `<table class="q-tbl"><thead><tr><th>الحساب</th><th>Cloudflare</th><th>Apps Script</th><th>تلخيص</th><th>مفتوح الآن</th></tr></thead><tbody>${us.map(x => `<tr><td dir="ltr">${esc(x.email || x.uid)}</td><td>${qFmt(x.cf)}</td><td>${qFmt(x.gas)}</td><td>${qFmt(x.ai)}</td><td>${qFmt(x.on || 0)}</td></tr>`).join('')}</tbody></table>` : '<div class="hint">لا استهلاك مسجّل بعد اليوم.</div>'}
+      ${us.length ? `<div class="q-tw"><table class="q-tbl"><thead><tr><th>الحساب</th><th>Cloudflare</th><th>Apps Script</th><th>تلخيص</th><th>مفتوح الآن</th></tr></thead><tbody>${us.map(x => `<tr class="q-em"><td colspan="4" dir="ltr">${esc(x.email || x.uid)}</td></tr><tr><td dir="ltr">${esc(x.email || x.uid)}</td><td>${qFmt(x.cf)}</td><td>${qFmt(x.gas)}</td><td>${qFmt(x.ai)}</td><td>${qFmt(x.on || 0)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="hint">لا استهلاك مسجّل بعد اليوم.</div>'}
       <div class="hint">يعدّه التطبيق في كل حساب ويرسله كل 30 ثانية، فيمثّل الاستخدام من داخل التطبيق. من يستدعي الخوادم من خارجه لا يظهر هنا، لكنه يظهر في المجموع الرسمي أعلاه.${more ? ` عُرض أول 20 حساباً، وبقي ${more.more}.` : ''}</div></div>`;
 }
 async function quotaOpen(fresh) {
