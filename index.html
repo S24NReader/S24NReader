@@ -849,6 +849,16 @@ function usePrune() { // لا يبقى إلا اليوم وأمس
   Object.keys(d).forEach(k => { if (!keep.includes(k)) m[k] = null; });
   if (Object.keys(m).length) Store.db.ref(`users/${USER.uid}/usage/d`).update(m).catch(() => {});
 }
+// حضور هذا التبويب: يُسجَّل عند كل اتصال ويحذفه خادم Firebase تلقائياً عند الانقطاع (لعدّ الاتصالات المتزامنة)
+const PRES_ID = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+function usePresence() {
+  if (Store.mode !== 'firebase' || !USER) return;
+  const r = Store.db.ref(`users/${USER.uid}/usage/on/${PRES_ID}`);
+  Store.db.ref('.info/connected').on('value', s => {
+    if (s.val() !== true) return;
+    r.onDisconnect().remove().then(() => r.set(Date.now())).catch(() => {});
+  });
+}
 addEventListener('pagehide', useFlush);
 document.addEventListener('visibilitychange', () => { if (document.hidden) useFlush(); });
 
@@ -2868,7 +2878,7 @@ function quotaHtml(j) {
   return `<div class="hint">آخر قراءة: ${esc(fullDate(j.at))}${j.memo ? ' (محفوظة من أقل من دقيقة)' : ''}. الألوان: أخضر، برتقالي من 70%، أحمر من 90%.</div>
     <div class="q-grid">${j.items.map(card).join('')}</div>
     <div class="box"><h5>الأكثر استهلاكاً اليوم (UTC)</h5>
-      ${us.length ? `<table class="q-tbl"><thead><tr><th>الحساب</th><th>Cloudflare</th><th>Apps Script</th><th>تلخيص</th></tr></thead><tbody>${us.map(x => `<tr><td dir="ltr">${esc(x.email || x.uid)}</td><td>${qFmt(x.cf)}</td><td>${qFmt(x.gas)}</td><td>${qFmt(x.ai)}</td></tr>`).join('')}</tbody></table>` : '<div class="hint">لا استهلاك مسجّل بعد اليوم.</div>'}
+      ${us.length ? `<table class="q-tbl"><thead><tr><th>الحساب</th><th>Cloudflare</th><th>Apps Script</th><th>تلخيص</th><th>مفتوح الآن</th></tr></thead><tbody>${us.map(x => `<tr><td dir="ltr">${esc(x.email || x.uid)}</td><td>${qFmt(x.cf)}</td><td>${qFmt(x.gas)}</td><td>${qFmt(x.ai)}</td><td>${qFmt(x.on || 0)}</td></tr>`).join('')}</tbody></table>` : '<div class="hint">لا استهلاك مسجّل بعد اليوم.</div>'}
       <div class="hint">يعدّه التطبيق في كل حساب ويرسله كل 30 ثانية، فيمثّل الاستخدام من داخل التطبيق. من يستدعي الخوادم من خارجه لا يظهر هنا، لكنه يظهر في المجموع الرسمي أعلاه.${more ? ` عُرض أول 20 حساباً، وبقي ${more.more}.` : ''}</div></div>`;
 }
 async function quotaOpen(fresh) {
@@ -3252,7 +3262,7 @@ async function start() {
   ITEMS_VER++;
   $('#auth').classList.add('hidden');
   VIEW = { type: setting('start') === 'all' ? 'all' : 'dash' }; SEL = null;
-  renderAll(); showBanner(); setupTimer(); pruneStates(); usePrune();
+  renderAll(); showBanner(); setupTimer(); pruneStates(); usePrune(); usePresence();
   setOffline(!navigator.onLine || OFFLINE_START);
   // تنظيف لمرة واحدة: نِسَب قراءة سُجّلت لمقالات بلا نص حقيقي (قبل اعتماد عدّ الأسطر)
   if (!lsGet('s24r_progfix1', false)) {
