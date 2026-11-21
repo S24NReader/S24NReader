@@ -1528,6 +1528,7 @@ function currentItems(opts = {}) {
   } else {
     list = [...ITEMS.values()].filter(it => S.feeds[it.feedId]);
     if (VIEW.type === 'feed') list = list.filter(it => it.feedId === VIEW.id);
+    if (VIEW.type === 'latest') list = list.filter(latestOk);
     if (VIEW.type === 'folder') list = list.filter(it => inFolder(S.feeds[it.feedId].folder, VIEW.id));
     if (VIEW.type === 'rule') {
       // صفحة الفلتر: كل المقالات المطابقة للقاعدة (حتى لو كانت قاعدة إخفاء أو معطّلة)
@@ -1548,6 +1549,7 @@ function currentItems(opts = {}) {
 function viewTitle() {
   if (VIEW.type === 'dash') return 'لوحة البداية';
   if (VIEW.type === 'all') return 'كل المقالات';
+  if (VIEW.type === 'latest') return 'عاجل الآن';
   if (VIEW.type === 'starred') return 'المميّزة بنجمة';
   if (VIEW.type === 'later') return 'للقراءة لاحقاً';
   if (VIEW.type === 'drafts') return 'المسودات';
@@ -2239,8 +2241,10 @@ const byDate = (a, b) => b.date - a.date;
 
 function dashWidget(k, UC) {
   if (k === 'latest') {
-    const list = groupDupes([...ITEMS.values()].filter(it => S.feeds[it.feedId] && !isHidden(it)).sort(byDate)).slice(0, 8);
-    return dwBox(k, ico('inbox'), 'عاجل الآن', UC.total ? `${UC.total} غير مقروء` : '', list.length ? list.map(it => dashRow(it, true)).join('') : `<div class="dw-e">لا أخبار بعد. اضغط تحديث لجلب أحدث المقالات.</div>`, allLink('all'), true);
+    const list = groupDupes([...ITEMS.values()].filter(it => S.feeds[it.feedId] && !isHidden(it) && latestOk(it)).sort(byDate)).slice(0, 8);
+    const sel = setting('latestSrc') || {}, cus = Object.keys(sel.folders || {}).length + Object.keys(sel.feeds || {}).length > 0;
+    const n = cus ? groupDupes([...ITEMS.values()].filter(it => S.feeds[it.feedId] && !isHidden(it) && !isRead(it.id) && latestOk(it))).length : UC.total;
+    return dwBox(k, ico('inbox'), 'عاجل الآن', n ? `${n} غير مقروء` : '', list.length ? list.map(it => dashRow(it, true)).join('') : `<div class="dw-e">لا أخبار بعد. اضغط تحديث لجلب أحدث المقالات.</div>`, allLink(cus ? 'latest' : 'all'), true);
   }
   if (k === 'later') {
     const all = Object.values(S.saved || {}).filter(it => st(it.id).l).map(it => ITEMS.get(it.id) || it);
@@ -2300,9 +2304,30 @@ function renderDash(box) {
 }
 
 function saveDash(order, off) { Store.write('settings/dash', { order, off }); renderList(); }
+function latestOk(it) {
+  const sel = setting('latestSrc') || {}, fo = sel.folders || {}, fe = sel.feeds || {};
+  if (!Object.keys(fo).length && !Object.keys(fe).length) return true;
+  if (fe[it.feedId]) return true;
+  const f = (S.feeds[it.feedId] || {}).folder || '';
+  return !!f && (!!fo[f] || !!fo[parentOf(f)]);
+}
+function latestSrcEdit() {
+  const sel = setting('latestSrc') || {}, fo = sel.folders || {}, fe = sel.feeds || {};
+  const row = (t, id, nm, on) => `<label class="dc-row" style="cursor:pointer"><input type="checkbox" data-t="${t}" data-id="${esc(id)}"${on ? ' checked' : ''}> <span class="rb">${esc(nm)}</span></label>`;
+  const fl = Object.keys(S.folders || {}).map(id => row('folders', id, '📁 ' + folderPath(id), fo[id])).join('');
+  const fd = Object.entries(S.feeds || {}).sort((a, b) => (a[1].title || '').localeCompare(b[1].title || '', 'ar')).map(([id, f]) => row('feeds', id, f.title || f.url || id, fe[id])).join('');
+  modal('مصادر «عاجل الآن»', `<p style="margin:0 0 12px;color:var(--tx2);font-size:14px">اختر المجلدات أو المصادر التي تظهر في «عاجل الآن». إن لم تختر شيئاً يظهر كل شيء.</p><div id="ls-l" style="max-height:55vh;overflow:auto">${fl}${fd}</div>`,
+    `<button class="btn pri" data-act="ls-save">حفظ</button><button class="btn" data-act="close-modal">إلغاء</button>`);
+}
+function latestSrcSave() {
+  const v = { folders: {}, feeds: {} };
+  $$('#ls-l input:checked').forEach(i => v[i.dataset.t][i.dataset.id] = 1);
+  closeModal(); Store.write('settings/latestSrc', v); renderList(); toast('حُفظت مصادر «عاجل الآن»');
+}
 async function dashWMenu(anchor, k) {
-  const c = await popMenu(anchor, [{ k: 'up', icon: 'up', label: 'نقل إلى الأمام' }, { k: 'down', icon: 'down', label: 'نقل إلى الخلف' }, '-', { k: 'hide', icon: 'x', label: 'إخفاء المربع' }]);
+  const c = await popMenu(anchor, [...(k === 'latest' ? [{ k: 'src', icon: 'folder', label: 'اختيار المصادر' }, '-'] : []), { k: 'up', icon: 'up', label: 'نقل إلى الأمام' }, { k: 'down', icon: 'down', label: 'نقل إلى الخلف' }, '-', { k: 'hide', icon: 'x', label: 'إخفاء المربع' }]);
   if (!c) return;
+  if (c === 'src') return latestSrcEdit();
   const order = dashKeys(), off = { ...((setting('dash') || {}).off || {}) };
   if (c === 'hide') { off[k] = 1; toast('أُخفي المربع. تعيده من زر «تخصيص».'); return saveDash(order, off); }
   const i = order.indexOf(k), step = c === 'up' ? -1 : 1; let j = i + step;
@@ -3166,6 +3191,7 @@ document.addEventListener('click', async e => {
       case 'dash-custom': dashCustom(); break;
       case 'dc-move': { const row = t.closest('.dc-row'), sib = Number(t.dataset.d) < 0 ? row.previousElementSibling : row.nextElementSibling; if (sib) Number(t.dataset.d) < 0 ? row.after(sib) : sib.after(row); break; }
       case 'dc-save': dashCustomSave(); break;
+      case 'ls-save': latestSrcSave(); break;
       case 'se-save': saveSettings(); break;
       case 'close-modal': closeModal(); break;
       case 'new-folder': newFolder(); break;
