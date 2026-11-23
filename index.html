@@ -571,6 +571,12 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
 .tr-sh .sp{flex:1}
 .tr-sh .ibtn{width:30px;height:30px}
 .tr-sh .bad{color:var(--danger)}
+.tr-old{display:flex;gap:6px;align-items:flex-start;margin:0 14px 6px;padding:6px 10px;border-radius:10px;font-size:12px;line-height:1.7;color:var(--danger);background:#fbe9e7}
+[data-theme="dark"] .tr-old{background:#3a1d1a}
+.tr-old svg{width:14px;height:14px;flex:none;margin-top:3px}
+.tr-upd{border-color:var(--ac)!important;color:var(--ac)!important;gap:6px}
+.tr-upd::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--ac);flex:none}
+.dw-h .tr-upd{font-size:12px;padding:0 8px;height:26px;flex:none}
 .tr-sl{list-style:none;margin:0;padding:0 6px}
 .tr-sl li{display:flex;align-items:flex-start;gap:10px;padding:8px;border-radius:10px;cursor:pointer}
 .tr-sl li:hover{background:var(--hover)}
@@ -2352,7 +2358,7 @@ const popAk = link => hash('a|' + linkKey(link));
 const popFk = url => url ? hash('f|' + String(url).trim().replace(/^https?:\/\/(www\.)?/i, '').replace(/\/+$/, '').toLowerCase()) : '';
 const popOn = () => Store.mode === 'firebase' && !!USER && !!Store.db;
 const POP_TTL = 10 * 60e3, POP_TOP_TTL = 30 * 60e3, POP_DWELL = 2500;
-const POP = { top: null, topAt: 0, live: {}, feed: {}, sites: null, sitesAt: 0, load: new Set(), err: '' };
+const POP = { top: null, topAt: 0, live: {}, feed: {}, sites: null, sitesAt: 0, load: new Set(), err: '', st: null, topLive: 0, watch: false };
 const VIRT = new Map();           // خبر من الترتيب ليس في مصادر هذا المستخدم: يُفتح في القارئ كأي خبر
 const POP_DONE = lsGet('s24r_popc', {}); // ما حُسب من هذا الجهاز اليوم، كي لا يُرسل طلب ترفضه القواعد
 const TR_DEF = { tab: 'read', per: 'day', hper: 'h24' };
@@ -2503,6 +2509,19 @@ function popSitesNeed() {
   POP.sitesAt = Date.now();
   popGet('sites', async () => { POP.sites = (await Store.db.ref('pop/sites/data').once('value')).val() || {}; });
 }
+// مؤشر «تحديث جديد»: يستمع إلى أوقات الجمع فقط (pop/sites/st نحو 220 بايت، و pop/top/at)، لا إلى القوائم نفسها
+function popWatch() {
+  if (POP.watch || !popOn()) return; POP.watch = true;
+  const bump = () => { POP_NV++; if (VIEW.type === 'trend' || VIEW.type === 'dash') scheduleRender(); }, off = () => {}; // إن رفضت القواعد القراءة لا يُعاد الاشتراك في كل رسم
+  Store.db.ref('pop/sites/st').on('value', s => { POP.st = s.val() || {}; bump(); }, off);
+  Store.db.ref('pop/top/at').on('value', s => { POP.topLive = +s.val() || 0; bump(); }, off);
+}
+const sitesNew = () => !!POP.sites && !!POP.st && Object.entries(POP.st).some(([k, t]) => POP.sites[k] && t > (POP.sites[k].at || 0) + 1000);
+const topNew = () => !!POP.top && POP.topLive > (POP.top.at || 0) + 1000;
+const updBtn = () => `<button class="btn sm tr-upd" data-act="tr-refresh" title="جمع الخادم بيانات أحدث مما على الشاشة">تحديث جديد</button>`;
+// نص الخطأ للقارئ، ووقت آخر جمع ناجح (ok يكتبه الخادم عند النجاح فقط)
+const siteErr = e => /\b403\b/.test(e || '') ? 'الموقع يحجب الجمع الآلي' : (e || '');
+const siteOkAt = s => s.err ? (s.ok || 0) : (s.at || 0);
 const siteList = () => Object.entries(POP.sites || {}).filter(([, s]) => s && s.on !== false && (s.items || s.err)).sort((a, b) => (a[1].o || 0) - (b[1].o || 0) || (a[1].name || '').localeCompare(b[1].name || '', 'ar'));
 // اكتشاف قائمة «الأكثر قراءة» في صفحة موقع: يُرجع المرشّحين مع محدد CSS يفهمه خادم Cloudflare (HTMLRewriter)
 const MR_RX = /(الأكثر|الاكثر)\s*(قراء|مشاهد|تداول|انتشار|شعبي|تفاعل|زيار|رواج)|يتصدر|يتصدّر|الرائج|الأكثر\s*قراءة|most[\s-]*(read|viewed|popular|shared)|trending\s*(now|news|stories)?|popular\s*(now|news|stories)/i;
@@ -2518,14 +2537,22 @@ function mrItems(el, pageUrl) {
     if (!(h === host || h.endsWith('.' + host) || host.endsWith('.' + h))) continue;
     if (u.pathname.length < 2 || MR_SKIP.test(u.pathname) || seen.has(u.href)) continue;
     const im = a.querySelector('img');
-    const t = (txt(a) || a.getAttribute('title') || (im && im.getAttribute('alt')) || '').replace(/\s+/g, ' ').trim();
+    const te = a.querySelector('[class*="title"]'), tt = te ? txt(te) : ''; // عنوان الخبر وحده، بلا رقم الترتيب واسم القسم
+    const t = (tt.length >= 15 ? tt : txt(a) || a.getAttribute('title') || (im && im.getAttribute('alt')) || '').replace(/\s+/g, ' ').trim();
     if (t.length < 15 || t.length > 260 || t.split(' ').length < 3) continue;
     seen.add(u.href);
     const src = im ? absUrl(im.getAttribute('data-src') || im.getAttribute('src') || '', pageUrl) : '';
     out.push({ t, l: u.href, i: src && !src.startsWith('data:') ? src : '' });
     if (out.length >= 10) break;
   }
-  return out;
+  return stripRank(out);
+}
+// «1 عنوان، 2 عنوان، 3 …»: إن بدأت كل العناوين بأرقام متتالية من 1 فهي أرقام ترتيب لا جزء من العنوان (القاعدة نفسها في الخادم)
+function stripRank(items) {
+  const m = items.map(x => /^(\d{1,2})[\s.)\-–]+(?=\S)/.exec(x.t));
+  const seq = items.length >= 3 && m[0] && +m[0][1] === 1 && m.every((y, i) => y && (+y[1] === 1 || (i > 0 && +y[1] === +m[i - 1][1] + 1)));
+  if (seq) items.forEach((x, i) => { x.t = x.t.slice(m[i][0].length); });
+  return items;
 }
 const cssId = s => /^-?[A-Za-z_][\w-]*$/.test(s);
 const CSS_UTIL = /^(col|row|d|p|m|px|py|pt|pb|pr|pl|mx|my|mt|mb|mr|ml|w|h|mh|flex|justify|align|text|bg|order|position|overflow|full|container|clearfix|g|gap|border|rounded|shadow|font|lh|fw|fs|hidden|block|inline|show|active|open)(-|$)/;
@@ -2580,7 +2607,7 @@ function mrDetect(doc, pageUrl) {
 const TR_SUB = {
   read: 'ما قرأه مستخدمو التطبيق أكثر من غيره. يُحسب الخبر لمن بقي فيه ثانيتين ونصفاً، مرة واحدة لكل قارئ في اليوم.',
   hot: 'الأخبار التي نشرها أكبر عدد من مصادرك. كلما نقلت الخبرَ مصادر أكثر صعد في الترتيب.',
-  sites: 'ترتيب كل موقع لأخباره، كما يعرضه في قائمة «الأكثر قراءة» عنده، ويُحدَّث كل نحو نصف ساعة.',
+  sites: 'ترتيب كل موقع لأخباره، كما يعرضه في قائمة «الأكثر قراءة» عنده. يُحدَّث كل نحو نصف ساعة، وكل 3 ساعات للمواقع التي تحجب الجمع المباشر.',
 };
 function trFill() { const d = { ...TR_DEF, ...lsGet('s24r_trend', {}) }; for (const k of Object.keys(TR_DEF)) if (VIEW[k] == null) VIEW[k] = d[k]; }
 const trSave = () => lsSet('s24r_trend', { tab: VIEW.tab, per: VIEW.per, hper: VIEW.hper });
@@ -2614,7 +2641,7 @@ const hotEntry = h => ({ it: h.it, n: h.n, unit: arUnit(h.n, ['مصدر', 'مص�
 function siteEntries(s) { return (s.items || []).slice(0, 10).map(x => ({ it: popItem({ ak: popAk(x.l), t: x.t, l: x.l, i: x.i || '', s: s.name || hostOf(s.url) }) })); }
 
 function renderTrend(box) {
-  trFill(); const V = VIEW;
+  trFill(); const V = VIEW; popWatch();
   if (V.scope && !scopeName(V.scope)) delete V.scope;
   const tabs = [['read', 'الأكثر قراءة', 'eye'], ['hot', 'الأكثر تداولاً', 'copy'], ['sites', 'في المواقع', 'globe']];
   const chip = V.scope ? `<span class="tr-chip">${ico(V.scope.type === 'feed' ? 'rss' : 'folder')}<span>${esc(scopeName(V.scope))}</span><button data-act="tr-scope-x" title="كل المصادر">${ico('x')}</button></span>` : '';
@@ -2624,7 +2651,7 @@ function renderTrend(box) {
   if (V.tab === 'read') {
     popNeed(V.per, V.scope);
     const r = popOn() ? popReads(V.per, V.scope) : null;
-    tools = chip + segB('per', [['day', 'اليوم'], ['week', '7 أيام']]) + `<span class="sp"></span>${r && r.ready && r.list.length ? `<span class="hint">حُدّث ${timeAgo(r.at)}</span>` : ''}${refresh}`;
+    tools = chip + segB('per', [['day', 'اليوم'], ['week', '7 أيام']]) + `<span class="sp"></span>${r && r.ready && r.list.length ? `<span class="hint">حُدّث ${timeAgo(r.at)}</span>` : ''}${!(V.scope && V.scope.type === 'feed') && topNew() ? updBtn() : ''}${refresh}`;
     if (!popOn()) body = trEmpty('eye', 'يحتاج حساباً', 'هذا الترتيب يجمع قراءات كل المستخدمين، فيعمل فقط بعد تسجيل الدخول.');
     else if (!r.ready) body = trSkel();
     else if (!r.list.length) body = POP.err ? trEmpty('alert', 'تعذّرت قراءة الترتيب', esc(POP.err), `<button class="btn" data-act="tr-refresh">إعادة المحاولة</button>`)
@@ -2637,13 +2664,14 @@ function renderTrend(box) {
       : list.length ? trBoard(list.map(hotEntry)) : trEmpty('copy', 'لا خبر نشرته أكثر من جهة بعد', `لم يظهر في آخر ${hrs === 6 ? '6 ساعات' : '24 ساعة'} خبر نشره مصدران أو أكثر${V.scope ? ' في هذا النطاق' : ''}. يكثر هذا مع كثرة المصادر.`);
   } else {
     popSitesNeed();
-    const L = siteList(), latest = Math.max(0, ...L.map(([, s]) => s.at || 0));
-    tools = `${latest ? `<span class="hint">آخر جمع ${timeAgo(latest)}</span>` : ''}<span class="sp"></span>${IS_ADMIN ? `<button class="btn sm" data-act="sites-admin">${ico('gear')}إدارة المواقع</button>` : ''}${refresh}`;
+    const L = siteList(), latest = Math.max(0, ...L.map(([, s]) => siteOkAt(s)));
+    tools = `${latest ? `<span class="hint">آخر جمع ${timeAgo(latest)}</span>` : ''}<span class="sp"></span>${sitesNew() ? updBtn() : ''}${IS_ADMIN ? `<button class="btn sm" data-act="sites-admin">${ico('gear')}إدارة المواقع</button>` : ''}${refresh}`;
     if (!popOn()) body = trEmpty('globe', 'يحتاج حساباً', 'قوائم المواقع تُقرأ من حسابك بعد تسجيل الدخول.');
     else if (POP.sites == null) body = POP.load.has('sites') ? `<div class="tr-sites">${'<div class="tr-sk" style="height:300px;border-radius:16px"></div>'.repeat(3)}</div>` : trEmpty('alert', 'تعذّرت قراءة قوائم المواقع', esc(POP.err || ''), `<button class="btn" data-act="tr-refresh">إعادة المحاولة</button>`);
     else if (!L.length) body = trEmpty('globe', 'لم تُضف مواقع بعد', IS_ADMIN ? 'أضف موقعاً يعرض قائمة «الأكثر قراءة» في صفحته، فيجمعها الخادم كل 10 دقائق ويراها كل المستخدمين.' : 'سيظهر هنا ترتيب المواقع لأخبارها بعد أن يضيفها المدير.', IS_ADMIN ? `<button class="btn pri" data-act="sites-admin">${ico('plus')}إضافة موقع</button>` : '');
     else body = `<div class="tr-sites">${L.map(([k, s]) => `<section class="tr-site" data-w="site:${esc(k)}"><div class="tr-sh">${favImg(favicon(s.url))}<h3>${esc(s.name || hostOf(s.url))}</h3>
-        <span class="dw-c${s.err ? ' bad' : ''}" title="${esc(s.err || '')}">${s.err ? 'تعذّر آخر جمع' : s.at ? timeAgo(s.at) : ''}</span><span class="sp"></span><a class="ibtn" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" title="فتح الموقع">${ico('ext')}</a></div>
+        <span class="dw-c${s.err ? ' bad' : ''}" title="${esc(s.err || '')}">${s.err ? 'تعذّر آخر جمع' : s.at ? timeAgo(s.at) : ''}</span><span class="sp"></span>${IS_ADMIN && trendsUrl() ? `<button class="ibtn" data-act="tr-site-run" data-k="${esc(k)}" title="اجمع هذا الموقع الآن">${ico('refresh')}</button>` : ''}<a class="ibtn" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" title="فتح الموقع">${ico('ext')}</a></div>
+        ${s.err && (s.items || []).length ? `<div class="tr-old">${ico('alert')}<span>${esc(siteErr(s.err))}. ${s.ok ? `هذه القائمة من آخر جمع ناجح ${timeAgo(s.ok)}.` : 'هذه القائمة من جمع سابق.'}</span></div>` : ''}
         ${(s.items || []).length ? `<ol class="tr-sl">${siteEntries(s).map((e, i) => `<li data-item="${esc(e.it.id)}"><span class="tr-n${i < 3 ? ' hot' : ''}">${i + 1}</span><span class="tr-t">${esc(e.it.title)}</span></li>`).join('')}</ol>` : `<div class="dw-e">${esc(s.err || 'لا أخبار في آخر جمع')}</div>`}</section>`).join('')}</div>`;
   }
   const keep = box.scrollTop;
@@ -2654,6 +2682,7 @@ function renderTrend(box) {
 }
 // مربع «الرائج» في لوحة البداية
 function trendWidget() {
+  popWatch();
   const t = lsGet('s24r_dwtr', 'read'), max = l => Math.max(1, ...l.map(e => e.n || 0));
   const tabs = `<div class="seg dw-tabs">${[['read', 'الأكثر قراءة'], ['hot', 'الأكثر تداولاً'], ['sites', 'في المواقع']].map(([k, l]) => `<button data-act="dw-trend" data-v="${k}" class="${t === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   let body;
@@ -2669,7 +2698,7 @@ function trendWidget() {
     const E = siteList().filter(([, s]) => (s.items || []).length).slice(0, 5).map(([, s]) => ({ ...siteEntries(s)[0], src: s.name || hostOf(s.url) }));
     body = E.length ? `<ol class="tr-list mini">${E.map((e, i) => trRow(e, i, 1).replace(/<span class="tr-n[^"]*">\d+<\/span>/, `<span class="tr-n hot" title="الأول في الموقع">1</span>`)).join('')}</ol>` : `<div class="dw-e">${POP.sites == null && popOn() ? 'جارٍ التحميل…' : 'لم تُضف مواقع بعد.'}</div>`;
   }
-  return dwBox('trend', ico('flame'), 'الرائج', '', tabs + body, `<button class="lnk" data-act="rail" data-k="trend">عرض الكل</button>`);
+  return dwBox('trend', ico('flame'), 'الرائج', '', tabs + body, `${(t === 'read' && topNew()) || (t === 'sites' && sitesNew()) ? updBtn() : ''}<button class="lnk" data-act="rail" data-k="trend">عرض الكل</button>`);
 }
 
 /* ---------- إدارة مواقع «الأكثر قراءة» (للمدير) ---------- */
@@ -2687,9 +2716,11 @@ async function trendsCall(path, body) {
 function msRows() {
   const data = POP.sites || {}, rows = Object.entries(MS.cfg).sort((a, b) => (a[1].name || '').localeCompare(b[1].name || '', 'ar'));
   return rows.length ? rows.map(([k, c]) => { const d = data[k] || {};
-    const stt = c.on === false ? '<span>معطّل</span>' : d.err ? `<span class="bad">${esc(d.err)}</span>` : d.at ? `<span class="ok">${(d.items || []).length} ${arUnit((d.items || []).length, ['خبر', 'خبران', 'أخبار', 'خبراً'])} · ${timeAgo(d.at)}</span>` : '<span>بانتظار أول جمع (خلال 10 دقائق)</span>';
+    const stt = c.on === false ? '<span>معطّل</span>' : d.err ? `<span class="bad">${esc(d.err)}</span>` : d.at ? `<span class="ok">${(d.items || []).length} ${arUnit((d.items || []).length, ['خبر', 'خبران', 'أخبار', 'خبراً'])} · ${timeAgo(d.at)}${{ gas: ' · عبر Google', fc: ' · عبر Firecrawl كل 3 ساعات' }[d.via] || ''}</span>` : '<span>بانتظار أول جمع (خلال 10 دقائق)</span>';
     return `<div class="ms-row">${favImg(favicon(c.url))}<div class="rb"><b>${esc(c.name)}</b> <span class="hint" dir="ltr">${esc(hostOf(c.url))}</span><div class="hint">${stt}</div><code>${esc(c.sel)}</code></div>
       <label class="toggle" title="تفعيل"><input type="checkbox" data-ms-on="${esc(k)}"${c.on === false ? '' : ' checked'}><span></span></label>
+      <button class="ibtn" data-act="ms-sel" data-k="${esc(k)}" title="تعديل المحدد">${ico('pen')}</button>
+      ${trendsUrl() && c.on !== false ? `<button class="ibtn" data-act="tr-site-run" data-k="${esc(k)}" title="اجمع هذا الموقع الآن">${ico('refresh')}</button>` : ''}
       <button class="ibtn" data-act="ms-del" data-id="${esc(k)}" title="حذف">${ico('trash')}</button></div>`; }).join('')
     : '<div class="hint">لا مواقع بعد.</div>';
 }
@@ -2747,6 +2778,28 @@ async function msRun() {
   toast('أطلب من الخادم جمع القوائم الآن…');
   try { const j = await trendsCall('/run'); toast(`جُمعت ${j.sites || 0} مواقع`); POP.sitesAt = 0; POP.topAt = 0; popSitesNeed(); setTimeout(() => { if ($('#ms-list')) $('#ms-list').innerHTML = msRows(); }, 2500); }
   catch (e) { toast('تعذّر: ' + e.message, 5000); }
+}
+// تعديل محدد CSS لموقع (مثلاً لاختيار لوح «اليوم» وحده من قائمة فيها اليوم والأسبوع والشهر)، ثم جمعه فوراً
+async function msSel(k) {
+  const c = MS.cfg[k]; if (!c) return;
+  const sel = (prompt(`محدد CSS لقائمة «الأكثر قراءة» في ${c.name}`, c.sel) || '').trim().slice(0, 300);
+  if (!sel || sel === c.sel) return;
+  const cfg = { ...c, sel };
+  try { await Store.db.ref('pop/sites/cfg/' + k).set(cfg); } catch (e) { return toast('تعذّر الحفظ: ' + e.message); }
+  MS.cfg[k] = cfg; if ($('#ms-list')) $('#ms-list').innerHTML = msRows();
+  if (trendsUrl()) siteRun(k); else toast('حُفظ المحدد');
+}
+// جمع موقع واحد الآن (للمدير): الخادم يجمعه وحده دون ملخص القراءات، ثم يُقرأ هذا الموقع وحده (بضعة KB)
+async function siteRun(k) {
+  if (!k || POP.runK) return; POP.runK = k; toast('أطلب من الخادم جمع هذا الموقع…');
+  try {
+    await trendsCall('/run', { k });
+    const d = (await Store.db.ref('pop/sites/data/' + k).once('value')).val();
+    if (d) { POP.sites = { ...(POP.sites || {}), [k]: d }; POP_NV++; scheduleRender(); }
+    if ($('#ms-list')) $('#ms-list').innerHTML = msRows();
+    toast(!d ? 'لم يُرجع الخادم شيئاً' : d.err ? 'ما زال الجمع يفشل: ' + siteErr(d.err) : `جُمعت ${(d.items || []).length} ${arUnit((d.items || []).length, ['خبر', 'خبران', 'أخبار', 'خبراً'])}`, 5000);
+  } catch (e) { toast('تعذّر: ' + e.message, 5000); }
+  finally { POP.runK = ''; }
 }
 // حذف عدّادات الأيام القديمة (احتياط إن لم يكن خادم الرائج منشوراً): مرة في اليوم من حساب المدير
 function popPrune() {
@@ -3739,13 +3792,15 @@ document.addEventListener('click', async e => {
       case 'tr-set': VIEW[t.dataset.k] = t.dataset.v; trSave(); renderList(); if (t.dataset.k === 'tab') $('#dash').scrollTop = 0; break;
       case 'tr-scope-x': delete VIEW.scope; renderList(); break;
       case 'trend-scope': trFill(); setView({ type: 'trend', tab: 'read', per: VIEW.per || lsGet('s24r_trend', {}).per || 'day', scope: { type: t.dataset.t, id } }); break;
-      case 'tr-refresh': if (Date.now() - (POP.rf || 0) < 20000) { toast('حُدّث قبل لحظات'); break; } POP.rf = Date.now(); POP.topAt = 0; POP.sitesAt = 0; POP.live = {}; POP.feed = {}; renderList(); break;
+      case 'tr-refresh': if (Date.now() - (POP.rf || 0) < 20000 && !sitesNew() && !topNew()) { toast('حُدّث قبل لحظات'); break; } POP.rf = Date.now(); POP.topAt = 0; POP.sitesAt = 0; POP.live = {}; POP.feed = {}; renderList(); break;
       case 'dw-trend': lsSet('s24r_dwtr', t.dataset.v); renderList(); break;
       case 'sites-admin': sitesAdmin(); break;
       case 'ms-scan': msScan(); break;
       case 'ms-manual': msManual(); break;
       case 'ms-adopt': msAdopt(Number(t.dataset.i)); break;
       case 'ms-run': msRun(); break;
+      case 'tr-site-run': siteRun(t.dataset.k); break;
+      case 'ms-sel': msSel(t.dataset.k); break;
       case 'ms-del': if (confirm('حذف هذا الموقع من «الأكثر قراءة»؟')) Store.db.ref().update({ ['pop/sites/cfg/' + id]: null, ['pop/sites/data/' + id]: null, ['pop/sites/st/' + id]: null }).then(() => { delete MS.cfg[id]; if (POP.sites) delete POP.sites[id]; $('#ms-list').innerHTML = msRows(); scheduleRender(); }).catch(e => toast(e.message)); break;
       case 'dc-move': { const row = t.closest('.dc-row'), sib = Number(t.dataset.d) < 0 ? row.previousElementSibling : row.nextElementSibling; if (sib) Number(t.dataset.d) < 0 ? row.after(sib) : sib.after(row); break; }
       case 'dc-save': dashCustomSave(); break;
