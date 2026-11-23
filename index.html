@@ -722,6 +722,7 @@ const CONFIG = {
   AI_URL: 'https://s24nreader-ai.s24nreader.workers.dev',   // خادم التلخيص الذكي (Gemini)
   STATS_URL: 'https://s24nreader-stats.s24nreader.workers.dev',   // خادم الحصص (للمدير فقط)
   TRENDS_URL: 'https://s24nreader-trends.s24nreader.workers.dev', // خادم «الرائج»: قوائم المواقع وترتيب القراءات
+  FEEDS_CDN: '', // الجلب المشترك: الرابط العام لمخزن R2 (مثل https://pub-xxxx.r2.dev)؛ فارغ = عبر خادم الجلب فقط
   GAS_URL: 'https://script.google.com/macros/s/AKfycbw8_DzpP6jCHdXvOZetYAKke7Dgyf2YrWkqTL-qvSQyxvcmj7tZyvvuiTccOjhwuyS3FA/exec',   // خادم الجلب الاحتياطي (Google Apps Script) للمواقع التي تحجب Cloudflare
   // ضع هنا كائن الإعدادات من Firebase Console لتفعيل الحسابات والمزامنة.
   // إن تُرك null يعمل التطبيق في "وضع محلي" (بيانات هذا المتصفح فقط).
@@ -972,11 +973,12 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) useFl
 /* =========================================================
    الجلب والتحليل
    ========================================================= */
-async function fetchText(url) {
+async function fetchText(url, opts = {}) {
   const w = workerUrl();
   if (!w) throw new Error('لم يُضبط خادم الجلب بعد (الإعدادات ← خادم الجلب)');
   if (CONFIG.GAS_URL && GAS_HOSTS.has(hostOf(url))) return fetchViaGas(url);
-  const r = await fetch(`${w}/fetch?url=${encodeURIComponent(url)}`);
+  if (opts.feed) { const c = await fetchShared(url); if (c) return c; }
+  const r = await fetch(`${w}/fetch?url=${encodeURIComponent(url)}${opts.feed ? '&k=feed' : ''}`);
   useCount('cf');
   if (!r.ok) {
     let j = {}; try { j = await r.json(); } catch {}
@@ -989,6 +991,20 @@ async function fetchText(url) {
     throw new Error(map[j.error] || ('خطأ ' + r.status));
   }
   return { text: await r.text(), finalUrl: r.headers.get('X-Final-Url') || url };
+}
+// الجلب المشترك: خادم الجلب يجدّد كل خلاصة مرة للجميع ويحفظها في R2 (f/<مفتاح>.json)،
+// فيقرؤها التطبيق مباشرة من الرابط العام دون طلب على الخادم. أقدم من 6 دقائق ← عبر خادم الجلب كالمعتاد
+const SHARED_MAX = 6 * 60e3;
+async function sharedKey(u) { const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(u)); return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32); }
+async function fetchShared(url) {
+  const base = (CONFIG.FEEDS_CDN || '').replace(/\/+$/, ''); if (!base || !(window.crypto && crypto.subtle)) return null;
+  try {
+    const href = new URL(url).href, r = await fetch(`${base}/f/${await sharedKey(href)}.json`, { cache: 'no-cache' });
+    if (!r.ok) return null;
+    const j = await r.json(), now = Date.parse(r.headers.get('Date') || '') || Date.now(); // ساعة الخادم لا ساعة الجهاز
+    if (!j || typeof j.x !== 'string' || j.u !== href || now - (j.at || 0) > SHARED_MAX) return null;
+    return { text: j.x, finalUrl: j.f || href };
+  } catch { return null; }
 }
 // المواقع التي تحجب خادم Cloudflare تُجلب عبر خادم Google الاحتياطي
 const GAS_HOSTS = new Set(lsGet('s24r_gas_hosts', []));
@@ -1288,7 +1304,7 @@ async function refreshFeed(feedId) {
   const feed = S.feeds[feedId]; if (!feed) return;
   FEED_STATUS[feedId] = { ...(FEED_STATUS[feedId] || {}), loading: true };
   try {
-    const { text, finalUrl } = await fetchText(feed.url); DATE_HOST = hostOf(finalUrl);
+    const { text, finalUrl } = await fetchText(feed.url, { feed: true }); DATE_HOST = hostOf(finalUrl);
     const p = parseDoc(text, finalUrl);
     let raw;
     if (feed.type !== 'html' && p.kind === 'html') throw new Error('الرابط لا يعيد خلاصة RSS صالحة');
