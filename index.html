@@ -1688,8 +1688,8 @@ function renderRail(UC) {
   const me = USER ? ((USER.displayName || USER.email || '?').trim()[0] || '?').toUpperCase() : '';
   $('#rail').innerHTML = `<button class="rl rl-logo hide-m" data-act="rail" data-k="dash" title="${esc(CONFIG.APP_NAME)}"><svg class="logo" viewBox="0 0 64 64"><use href="#i-logo"/></svg></button>`
     + b('dash', 'home', 'لوحة البداية')
-    + b('trend', 'flame', 'الرائج')
     + b('feeds', 'rss', 'المصادر', fmtN(UC.total))
+    + b('trend', 'flame', 'الرائج')
     + b('saved', 'bookmark', 'المحفوظات', fmtN(countSaved('l')))
     + b('drafts', 'pen', 'المسودات', fmtN(Object.keys(S.drafts || {}).length))
     + b('search', 'search', 'البحث ( / )', '', ' hide-m')
@@ -2926,7 +2926,8 @@ async function feedErrMenu(anchor) {
   const c = await popMenu(anchor, errs.map(([id, f]) => ({ k: id, icon: 'alert', label: `${esc(f.title || hostOf(f.url))} <small style="color:var(--tx3)">— ${esc(FEED_STATUS[id].error)}</small>` })));
   if (c) setView({ type: 'feed', id: c });
 }
-function toggleTheme() { Store.write('settings/theme', document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); applyTheme(); renderSide(); }
+// إذا أعاد الزر المستخدمَ إلى وضع جهازه نفسه، يرجع الإعداد إلى «تلقائي» فلا يضيع بضغطة
+function toggleTheme() { const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; Store.write('settings/theme', next === (mq.matches ? 'dark' : 'light') ? 'auto' : next); applyTheme(); renderSide(); }
 async function logout() { if (confirm('تسجيل الخروج من حسابك؟')) { await firebase.auth().signOut(); location.reload(); } }
 // أيقونات الشريط: الانتقال بين الأقسام (وعلى الجوال تفتح اللوحة الجانبية)
 function railGo(k) {
