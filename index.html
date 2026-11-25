@@ -507,7 +507,7 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
   .lh-s{max-width:none}
 }
 @media (max-width:1100px){ .main.nopanel{grid-template-columns:minmax(0,1fr)} }
-/* الجوال: رأس القائمة على طريقة Inoreader (☰ · 👁 · 🔍 · ⟳ ثم العنوان و ⋯) ولوحة الخيارات السفلية */
+/* الجوال: شريط علوي لأدوات الصفحة (👁 · 🔍 · ⟳) ثم العنوان و ⋯ ولوحة الخيارات السفلية؛ التنقل بين الأقسام في الشريط السفلي */
 .mhd{display:flex;align-items:center;gap:2px;padding:6px 8px 0;background:var(--panel)}
 .mhd-sp{flex:1}
 .mhd .ibtn{width:42px;height:42px;color:var(--tx)}
@@ -672,7 +672,7 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
   <nav class="rail" id="rail"></nav>
   <div class="content">
     <div id="banner" class="banner hidden"></div>
-    <div class="mhd only-m"><button class="ibtn" data-act="toggle-side" title="المصادر"><svg class="ico"><use href="#i-menu"/></svg></button><span class="mhd-sp"></span><button class="ibtn" id="m-u" data-act="lf" data-v="unread" title="غير المقروء فقط"><svg class="ico"><use href="#i-eye"/></svg></button><button class="ibtn" id="m-q" data-act="m-search" title="البحث"><svg class="ico"><use href="#i-search"/></svg></button><button class="ibtn" id="m-r" data-act="refresh" title="تحديث"><svg class="ico refresh-ico"><use href="#i-refresh"/></svg></button></div>
+    <div class="mhd only-m"><span class="mhd-sp"></span><button class="ibtn" id="m-u" data-act="lf" data-v="unread" title="غير المقروء فقط"><svg class="ico"><use href="#i-eye"/></svg></button><button class="ibtn" id="m-q" data-act="m-search" title="البحث"><svg class="ico"><use href="#i-search"/></svg></button><button class="ibtn" id="m-r" data-act="refresh" title="تحديث"><svg class="ico refresh-ico"><use href="#i-refresh"/></svg></button></div>
     <div class="main" id="main" style="flex:1">
       <aside class="side" id="side"></aside>
       <section class="list">
@@ -3811,7 +3811,7 @@ function endFeedDrag(e) {
    ========================================================= */
 document.addEventListener('click', async e => {
   // الجوال: النقر خارج اللوحة الجانبية يغلقها
-  if (innerWidth <= 760 && $('#side').classList.contains('open') && !e.target.closest('#side,#rail,[data-act="toggle-side"]')) $('#side').classList.remove('open');
+  if (innerWidth <= 760 && $('#side').classList.contains('open') && !e.target.closest('#side,#rail')) $('#side').classList.remove('open');
   const t = e.target.closest('[data-act],[data-view],[data-item],[data-draft]'); if (!t) return;
   const act = t.dataset.act, id = t.dataset.id;
   if (act) {
