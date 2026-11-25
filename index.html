@@ -507,6 +507,36 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
   .lh-s{max-width:none}
 }
 @media (max-width:1100px){ .main.nopanel{grid-template-columns:minmax(0,1fr)} }
+/* الجوال: رأس القائمة على طريقة Inoreader (☰ · 👁 · 🔍 · ⟳ ثم العنوان و ⋯) ولوحة الخيارات السفلية */
+.mhd{display:flex;align-items:center;gap:2px;padding:6px 8px 0;background:var(--panel)}
+.mhd-sp{flex:1}
+.mhd .ibtn{width:42px;height:42px;color:var(--tx)}
+.mhd .ibtn .ico{width:22px;height:22px}
+.mhd .ibtn.on{background:var(--ac2);color:var(--ac)}
+.msheet{position:fixed;inset:0;z-index:55}
+.ms-dim{position:absolute;inset:0;background:#0007}
+.ms-b{position:absolute;left:0;right:0;bottom:0;background:var(--panel);border-radius:18px 18px 0 0;padding:8px 16px calc(14px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px #0003;max-height:85vh;overflow:auto}
+.ms-grab{width:40px;height:4px;border-radius:3px;background:var(--line);margin:4px auto 6px}
+.ms-h{font-size:13px;font-weight:700;color:var(--tx3);margin:12px 0 7px}
+.ms-r{display:flex;gap:8px}
+.ms-p{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 12px;border-radius:20px;background:var(--bg);border:1px solid var(--line);font-size:14px;color:var(--tx2)}
+.ms-p .ico{width:17px;height:17px}
+.ms-p.on{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600}
+.ms-a{display:flex;width:100%;align-items:center;gap:12px;padding:13px 2px;border-top:1px solid var(--line2);font-size:15px;color:var(--tx);text-align:right}
+.ms-r+.ms-a{margin-top:14px}
+.ms-a .ico{width:20px;height:20px;color:var(--tx2)}
+@media (max-width:760px){
+  .list-h{flex-wrap:nowrap;align-items:flex-end;padding:2px 16px 12px;min-height:0}
+  #list-h{display:block;flex:1;min-width:0}
+  #list-h h2{font-size:23px}
+  #list-h .ma-g,#list-h .seg,#list-h2>:not(.lh-more),.lh-r{display:none!important}
+  .lh-n{display:block;font-size:13px;color:var(--tx3);margin-top:2px}
+  .list:not(.srch) .lh-s,.list:not(.srch) .lh-x{display:none}
+  .list.srch .mhd,.list.srch #list-h,.list.srch #list-h2{display:none}
+  .list.srch .list-h{align-items:center;padding:8px 8px 8px 4px}
+  .list.srch .lh-s input{height:40px;font-size:16px}
+  .list.srch .lh-s input::-webkit-search-cancel-button{display:none}
+}
 /* ---------- الرائج: الأكثر قراءة، الأكثر تداولاً، الأكثر قراءة في المواقع ---------- */
 :root{--heat:#b85a08;--heat2:#fbeee2}
 [data-theme="dark"]{--heat:#ffa94d;--heat2:#33261a}
@@ -645,7 +675,8 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
     <div class="main" id="main" style="flex:1">
       <aside class="side" id="side"></aside>
       <section class="list">
-        <div class="list-h"><div id="list-h"></div><div class="search lh-s"><svg class="ico"><use href="#i-search"/></svg><input id="q" type="search" placeholder="ابحث في المقالات…  ( / )" autocomplete="off"></div><div id="list-h2"></div><button class="ibtn lh-r" data-act="refresh" title="تحديث (r)"><svg class="ico refresh-ico" id="refresh-ico"><use href="#i-refresh"/></svg></button></div>
+        <div class="mhd only-m"><button class="ibtn" data-act="toggle-side" title="المصادر"><svg class="ico"><use href="#i-menu"/></svg></button><span class="mhd-sp"></span><button class="ibtn" id="m-u" data-act="lf" data-v="unread" title="غير المقروء فقط"><svg class="ico"><use href="#i-eye"/></svg></button><button class="ibtn" id="m-q" data-act="m-search" title="البحث"><svg class="ico"><use href="#i-search"/></svg></button><button class="ibtn" id="m-r" data-act="refresh" title="تحديث"><svg class="ico refresh-ico"><use href="#i-refresh"/></svg></button></div>
+        <div class="list-h"><div id="list-h"></div><div class="search lh-s"><svg class="ico"><use href="#i-search"/></svg><input id="q" type="search" placeholder="ابحث في المقالات…  ( / )" autocomplete="off"></div><button class="ibtn only-m lh-x" data-act="m-search-x" title="إغلاق البحث"><svg class="ico"><use href="#i-x"/></svg></button><div id="list-h2"></div><button class="ibtn lh-r" data-act="refresh" title="تحديث (r)"><svg class="ico refresh-ico" id="refresh-ico"><use href="#i-refresh"/></svg></button></div>
         <div class="items" id="items"></div>
       </section>
       <section class="reader" id="reader"></section>
@@ -1779,7 +1810,7 @@ function renderListHead() {
   if (isDrafts) h += `<button class="btn sm" data-act="new-draft">${ico('plus')}مسودة</button>`;
   else {
     if (!isSaved) {
-      const un = currentItems({ all: true }).filter(it => !isRead(it.id)).length;
+      const un = currentItems({ all: true }).filter(it => !isRead(it.id)).length; h = h.replace('</h2>', `</h2><span class="lh-n only-m">${un ? fmtN(un) + ' غير مقروءة' : 'لا جديد'}</span>`);
       h += `<span class="ma-g"><button class="btn sm ma" data-act="mark-all" title="تعليم الكل كمقروء">${ico('checks')}<span class="t">تعليم الكل كمقروء</span></button><button class="btn sm ma-dd" data-act="mark-menu" title="خيارات التعليم">${ico('chev', 'dn')}</button></span>`;
       h += `<div class="seg"><button data-act="lf" data-v="unread" class="${setting('listFilter') === 'unread' ? 'on' : ''}">غير المقروء${un ? ` <b>${fmtN(un)}</b>` : ''}</button><button data-act="lf" data-v="all" class="${setting('listFilter') === 'all' ? 'on' : ''}">الكل</button></div>`;
     }
@@ -1789,6 +1820,10 @@ function renderListHead() {
     if (VIEW.type === 'tag') h2 += `<button class="ibtn" data-act="tag-menu" data-id="${esc(VIEW.id)}" title="خيارات الوسم">${ico('more')}</button>`;
     if (VIEW.type === 'rule') h2 += `<button class="ibtn" data-act="rule-edit" data-id="${esc(VIEW.id)}" title="تعديل الفلتر">${ico('pen')}</button>`;
   }
+  if (!isDrafts) h2 += `<button class="ibtn only-m lh-more" data-act="m-sheet" title="خيارات القائمة">${ico('more')}</button>`;
+  const mu = $('#m-u'), lf = setting('listFilter'); mu.classList.toggle('hidden', isDrafts || isSaved); mu.classList.toggle('on', lf === 'unread'); mu.dataset.v = lf === 'unread' ? 'all' : 'unread'; mu.title = lf === 'unread' ? 'إظهار الكل' : 'غير المقروء فقط';
+  $('#m-q').classList.toggle('hidden', isDrafts); $('#m-r').classList.toggle('hidden', isDrafts);
+  if (QUERY) $('#main > .list').classList.add('srch');
   $('#list-h').innerHTML = h; $('#list-h2').innerHTML = h2;
   $('.lh-s').classList.toggle('hidden', isDrafts); $('.lh-r').classList.toggle('hidden', isDrafts);
 }
@@ -3089,6 +3124,24 @@ async function quickAdd(url, title) {
 }
 
 /* ---------- قوائم المصادر والمجلدات ---------- */
+// الجوال: لوحة سفلية بخيارات القائمة الحالية (على طريقة Inoreader)
+function mSheet() {
+  document.querySelectorAll('.msheet').forEach(m => m.remove());
+  const isSaved = VIEW.type === 'starred' || VIEW.type === 'later' || VIEW.type === 'tag', lf = setting('listFilter'), v = setting('view'), so = setting('sort');
+  const pill = (act, val, on, label, icon) => `<button class="ms-p${on ? ' on' : ''}" data-act="${act}" data-v="${val}">${icon ? ico(icon) : ''}${label}</button>`;
+  let h = `<div class="ms-dim"></div><div class="ms-b"><div class="ms-grab"></div>`
+    + `<div class="ms-h">العرض</div><div class="ms-r">${pill('view-mode', 'list', v !== 'cards', 'قائمة', 'list')}${pill('view-mode', 'cards', v === 'cards', 'بطاقات', 'grid')}</div>`
+    + (isSaved ? '' : `<div class="ms-h">الإظهار</div><div class="ms-r">${pill('lf', 'all', lf === 'all', 'الكل')}${pill('lf', 'unread', lf === 'unread', 'غير المقروء')}</div>`)
+    + `<div class="ms-h">الترتيب</div><div class="ms-r">${pill('m-sort', 'new', so !== 'old', 'الأحدث أولاً')}${pill('m-sort', 'old', so === 'old', 'الأقدم أولاً')}</div>`;
+  if (!isSaved) h += `<button class="ms-a" data-act="mark-all">${ico('checks')}تعليم الكل كمقروء</button>`;
+  if (VIEW.type === 'feed' || VIEW.type === 'folder') h += `<button class="ms-a" data-act="trend-scope" data-t="${VIEW.type}" data-id="${esc(VIEW.id)}">${ico('flame')}الأكثر قراءة هنا</button>`;
+  if (VIEW.type === 'feed') h += `<button class="ms-a" data-act="feed-menu" data-id="${esc(VIEW.id)}">${ico('gear')}خيارات المصدر</button>`;
+  if (VIEW.type === 'tag') h += `<button class="ms-a" data-act="tag-menu" data-id="${esc(VIEW.id)}">${ico('gear')}خيارات الوسم</button>`;
+  if (VIEW.type === 'rule') h += `<button class="ms-a" data-act="rule-edit" data-id="${esc(VIEW.id)}">${ico('pen')}تعديل الفلتر</button>`;
+  const m = document.createElement('div'); m.className = 'msheet'; m.innerHTML = h + '</div>'; document.body.appendChild(m);
+  // يُغلق بعد تنفيذ الإجراء (setTimeout) كي تعمل القوائم المنبثقة من موضع الزر
+  m.addEventListener('click', e => { if (e.target.closest('.ms-dim,[data-act]')) setTimeout(() => m.remove()); });
+}
 function popMenu(anchor, items) {
   document.querySelectorAll('.menu').forEach(m => m.remove());
   const m = document.createElement('div'); m.className = 'menu';
@@ -3758,7 +3811,7 @@ function endFeedDrag(e) {
    ========================================================= */
 document.addEventListener('click', async e => {
   // الجوال: النقر خارج اللوحة الجانبية يغلقها
-  if (innerWidth <= 760 && $('#side').classList.contains('open') && !e.target.closest('#side,#rail')) $('#side').classList.remove('open');
+  if (innerWidth <= 760 && $('#side').classList.contains('open') && !e.target.closest('#side,#rail,[data-act="toggle-side"]')) $('#side').classList.remove('open');
   const t = e.target.closest('[data-act],[data-view],[data-item],[data-draft]'); if (!t) return;
   const act = t.dataset.act, id = t.dataset.id;
   if (act) {
@@ -3766,6 +3819,10 @@ document.addEventListener('click', async e => {
     const it = SEL && getItem(SEL);
     switch (act) {
       case 'toggle-side': $('#side').classList.toggle('open'); break;
+      case 'm-search': $('#main > .list').classList.add('srch'); $('#q').focus(); break;
+      case 'm-search-x': $('#main > .list').classList.remove('srch'); if (QUERY || $('#q').value) { $('#q').value = ''; QUERY = ''; renderList(); } break;
+      case 'm-sheet': mSheet(); break;
+      case 'm-sort': Store.write('settings/sort', t.dataset.v); renderList(); break;
       case 'refresh': refreshAll(); break;
       case 'refresh-one': refreshFeed(id); break;
       case 'add-feed': openAddFeed(); break;
