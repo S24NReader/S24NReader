@@ -198,6 +198,10 @@ body.feed-dragging .nav-i:hover{background:none}
 .art{max-width:760px;margin:0 auto;padding:26px 28px 80px}
 .art-src{display:flex;align-items:center;gap:8px;color:var(--tx3);font-size:13px}
 .art-src img{width:18px;height:18px;border-radius:4px}
+.art-src-l{display:inline-flex;align-items:center;gap:3px;color:var(--ac);font:inherit;font-weight:600;padding:2px 0}
+.art-src-l .ico{width:14px;height:14px}
+.art-src-l:hover span{text-decoration:underline}
+.art-fol{font-weight:600}
 .art h1{font-size:27px;line-height:1.45;margin:10px 0 8px}
 .art h1 a{color:var(--tx);text-decoration:none}
 .art h1 a:hover{color:var(--ac)}
@@ -1960,7 +1964,9 @@ function _renderReader(r) {
       <a class="btn sm" href="${esc(it.link)}" target="_blank" rel="noopener noreferrer">${ico('ext')}<span class="hide-m">الموقع الأصلي</span></a>
     </div>
     <article class="art" style="${readPrefsStyle()}">
-      <div class="art-src"><img src="${esc(favicon(f.siteUrl || f.url || it.link))}" alt="" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"><span>${esc(f.title)}</span></div>
+      <div class="art-src"><img src="${esc(favicon(f.siteUrl || f.url || it.link))}" alt="" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">${S.feeds[it.feedId]
+        ? `<button class="art-src-l" data-act="go-feed" data-id="${esc(it.feedId)}" title="كل أخبار هذا المصدر"><span>${esc(f.title)}</span>${ico('chl')}</button>`
+        : `<span>${esc(f.title)}</span><button class="lnk art-fol" data-act="follow-src" data-u="${esc(siteOrigin(it.link))}">+ متابعة هذا المصدر</button>`}</div>
       <h1><a href="${esc(it.link)}" target="_blank" rel="noopener noreferrer">${esc(it.title)}</a></h1>
       <div class="art-meta">${it.noDate ? 'من قائمة «الأكثر قراءة» في الموقع' : esc(fullDate(it.date))}${it.author ? ' · ' + esc(it.author) : ''} · ${readMinutes(it)} د قراءة</div>
       ${dg ? `<details class="art-dups"><summary>${ico('copy')}<b>نُشر هذا الخبر في ${dg.length} مصادر</b><span>الأول: ${esc(dupFeedName(dg.reduce((a, b) => b.date < a.date ? b : a)))}</span>${ico('chev', 'dn')}</summary><div class="dup-list">${dupRows(dg, it.id)}</div></details>` : ''}
@@ -2361,13 +2367,66 @@ function readerSig() {
 let _lastSig = '', _lastSel = null;
 function renderAll() { applyTheme(); renderSide(); renderList(); renderReader(true); }
 
+/* ---------- زر الرجوع (أندرويد والمتصفح) ----------
+   التطبيق صفحة واحدة، فكان الرجوع يخرج منه. الآن: سجلّ داخلي للخطوات (NAV) ومدخل «حارس» واحد في سجلّ المتصفح.
+   الرجوع يزيل الحارس فيُلتقط هنا: يغلق ما فوق الصفحة، أو يعيد الخطوة السابقة، ثم يعيد الحارس.
+   في الصفحة الرئيسية: «اضغط رجوع مرة أخرى للخروج» (ثانيتان بلا حارس، فالضغطة الثانية تخرج فعلاً). */
+const NAV = []; let NAV_ON = false, NAV_RESTORE = false, EXIT_AT = 0;
+const siteOrigin = u => { try { return new URL(u).origin + '/'; } catch { return ''; } };
+const homeView = () => ({ type: setting('start') === 'all' ? 'all' : 'dash' });
+const navSnap = () => ({ v: JSON.parse(JSON.stringify(VIEW)), sel: SEL, y: $('#items').scrollTop, dy: $('#dash').scrollTop, ry: SEL ? $('#reader').scrollTop : 0 });
+const navKey = s => JSON.stringify(s.v) + '|' + (s.sel || '');
+function navArm() { if (NAV_ON && !(history.state && history.state.s24g)) history.pushState({ s24g: 1 }, ''); }
+function navPush() {
+  if (!NAV_ON || NAV_RESTORE) return;
+  const s = navSnap(), top = NAV[NAV.length - 1];
+  if (!top || navKey(top) !== navKey(s)) { NAV.push(s); if (NAV.length > 60) NAV.shift(); }
+  navArm();
+}
+function navRestore(s) {
+  NAV_RESTORE = true;
+  try {
+    if (JSON.stringify(s.v) !== JSON.stringify(VIEW)) setView(s.v);
+    if (s.sel && getItem(s.sel)) { if (SEL !== s.sel) openItem(s.sel); } else if (SEL) closeReader();
+    const y = s.y, dy = s.dy, ry = s.ry;
+    requestAnimationFrame(() => { $('#items').scrollTop = y; $('#dash').scrollTop = dy; if (SEL) $('#reader').scrollTop = ry; });
+  } finally { NAV_RESTORE = false; }
+}
+function navBack() {
+  // 1) ما فوق الصفحة أولاً
+  if (document.querySelector('.menu,.tagpop')) { document.querySelectorAll('.menu,.tagpop').forEach(m => m.remove()); return true; }
+  if ($('#ov')) { closeModal(); return true; }
+  const sh = document.querySelector('.msheet'); if (sh) { sh.remove(); return true; }
+  if (innerWidth <= 760 && $('#side').classList.contains('open')) { $('#side').classList.remove('open'); return true; }
+  if ($('#main').classList.contains('srch')) { $('#main').classList.remove('srch'); if (QUERY || $('#q').value) { $('#q').value = ''; QUERY = ''; renderList(); } return true; }
+  // 2) الخطوة السابقة (تُتخطى الخطوة المطابقة لما على الشاشة)
+  const cur = navKey(navSnap());
+  while (NAV.length) { const s = NAV.pop(); if (navKey(s) !== cur) { navRestore(s); return true; } }
+  // 3) لا خطوات: إلى الصفحة الرئيسية قبل الخروج
+  if (SEL) { closeReader(); return true; }
+  const h = homeView(); if (VIEW.type !== h.type) { NAV_RESTORE = true; try { setView(h); } finally { NAV_RESTORE = false; } return true; }
+  return false;
+}
+addEventListener('popstate', e => {
+  if (!NAV_ON) return;
+  const guarded = !!(e.state && e.state.s24g);
+  if (navBack()) { EXIT_AT = 0; if (!guarded) navArm(); return; }
+  if (guarded) { history.back(); return; }
+  EXIT_AT = Date.now(); toast('اضغط رجوع مرة أخرى للخروج', 2000);
+  setTimeout(() => { if (EXIT_AT && Date.now() - EXIT_AT >= 1900) { EXIT_AT = 0; navArm(); } }, 2000);
+});
+// أي لمسة تعيد الحارس إن غاب، وتمنح Chrome «تفاعل المستخدم» الذي يشترطه كي لا يتخطى مدخل الحارس
+addEventListener('pointerdown', () => { if (!EXIT_AT) navArm(); }, true);
+
 function setView(v, sel = null) {
+  navPush();
   VIEW = v; SEL = sel; KEEP_VIS.clear(); if (v.type !== 'dash' && v.type !== 'trend') DASH_CTX = [];
   $('#main').classList.toggle('reading', !!sel);
   $('#side').classList.remove('open');
   renderAll(); $('#items').scrollTop = 0; $('#dash').scrollTop = 0;
 }
 function openItem(id) {
+  if (!SEL) navPush(); // من القائمة إلى مقالة خطوة؛ التنقل بين المقالات ليس خطوة
   SEL = id; KEEP_VIS.add(id); $('#main').classList.add('reading');
   if (setting('autoRead') && !isRead(id)) setFlag(id, 'r', true);
   popSchedule(id);
@@ -3887,6 +3946,8 @@ document.addEventListener('click', async e => {
       case 'new-folder': newFolder(); break;
       case 'fo-save': saveFolder(); break;
       case 'feed-menu': feedMenu(t, id); break;
+      case 'go-feed': { const cur = SEL; setView({ type: 'feed', id }); if (cur) { KEEP_VIS.add(cur); renderList(); const el = $(`[data-item="${CSS.escape(cur)}"]`); if (el) { el.classList.add('sel'); el.scrollIntoView({ block: 'center' }); } } break; }
+      case 'follow-src': openAddFeed(t.dataset.u); setTimeout(() => { const b = $('[data-act="af-check"]'); if (b && t.dataset.u) b.click(); }); break;
       case 'feed-resume': setPause(id, null); toast('استُؤنف جلب المصدر'); refreshFeed(id); break;
       case 'folder-menu': folderMenu(t, id); break;
       case 'toggle-folder': collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id); lsSet('s24r_collapsed', [...collapsed]); renderSide(); break;
@@ -4019,6 +4080,7 @@ async function start() {
   $('#auth').classList.add('hidden');
   VIEW = { type: setting('start') === 'all' ? 'all' : 'dash' }; SEL = null;
   renderAll(); showBanner(); setupTimer(); pruneStates(); usePrune(); usePresence();
+  NAV_ON = true; navArm();
   setTimeout(() => { popNeed('day'); popPrune(); }, 5000); // ترتيب القراءات لشارات القوائم، وتنظيف الأيام القديمة
   setOffline(!navigator.onLine || OFFLINE_START);
   // تنظيف لمرة واحدة: نِسَب قراءة سُجّلت لمقالات بلا نص حقيقي (قبل اعتماد عدّ الأسطر)
