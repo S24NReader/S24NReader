@@ -531,11 +531,11 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
   #list-h h2{font-size:23px}
   #list-h .ma-g,#list-h .seg,#list-h2>:not(.lh-more),.lh-r{display:none!important}
   .lh-n{display:block;font-size:13px;color:var(--tx3);margin-top:2px}
-  .list:not(.srch) .lh-s,.list:not(.srch) .lh-x{display:none}
-  .list.srch .mhd,.list.srch #list-h,.list.srch #list-h2{display:none}
-  .list.srch .list-h{align-items:center;padding:8px 8px 8px 4px}
-  .list.srch .lh-s input{height:40px;font-size:16px}
-  .list.srch .lh-s input::-webkit-search-cancel-button{display:none}
+  .main:not(.srch) .lh-s,.main:not(.srch) .lh-x{display:none}
+  .content:has(.main.srch) .mhd,.content:has(.main.reading) .mhd,.main.srch #list-h,.main.srch #list-h2{display:none}
+  .main.srch .list-h{align-items:center;padding:8px 8px 8px 4px}
+  .main.srch .lh-s input{height:40px;font-size:16px}
+  .main.srch .lh-s input::-webkit-search-cancel-button{display:none}
 }
 /* ---------- الرائج: الأكثر قراءة، الأكثر تداولاً، الأكثر قراءة في المواقع ---------- */
 :root{--heat:#b85a08;--heat2:#fbeee2}
@@ -672,10 +672,10 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
   <nav class="rail" id="rail"></nav>
   <div class="content">
     <div id="banner" class="banner hidden"></div>
+    <div class="mhd only-m"><button class="ibtn" data-act="toggle-side" title="المصادر"><svg class="ico"><use href="#i-menu"/></svg></button><span class="mhd-sp"></span><button class="ibtn" id="m-u" data-act="lf" data-v="unread" title="غير المقروء فقط"><svg class="ico"><use href="#i-eye"/></svg></button><button class="ibtn" id="m-q" data-act="m-search" title="البحث"><svg class="ico"><use href="#i-search"/></svg></button><button class="ibtn" id="m-r" data-act="refresh" title="تحديث"><svg class="ico refresh-ico"><use href="#i-refresh"/></svg></button></div>
     <div class="main" id="main" style="flex:1">
       <aside class="side" id="side"></aside>
       <section class="list">
-        <div class="mhd only-m"><button class="ibtn" data-act="toggle-side" title="المصادر"><svg class="ico"><use href="#i-menu"/></svg></button><span class="mhd-sp"></span><button class="ibtn" id="m-u" data-act="lf" data-v="unread" title="غير المقروء فقط"><svg class="ico"><use href="#i-eye"/></svg></button><button class="ibtn" id="m-q" data-act="m-search" title="البحث"><svg class="ico"><use href="#i-search"/></svg></button><button class="ibtn" id="m-r" data-act="refresh" title="تحديث"><svg class="ico refresh-ico"><use href="#i-refresh"/></svg></button></div>
         <div class="list-h"><div id="list-h"></div><div class="search lh-s"><svg class="ico"><use href="#i-search"/></svg><input id="q" type="search" placeholder="ابحث في المقالات…  ( / )" autocomplete="off"></div><button class="ibtn only-m lh-x" data-act="m-search-x" title="إغلاق البحث"><svg class="ico"><use href="#i-x"/></svg></button><div id="list-h2"></div><button class="ibtn lh-r" data-act="refresh" title="تحديث (r)"><svg class="ico refresh-ico" id="refresh-ico"><use href="#i-refresh"/></svg></button></div>
         <div class="items" id="items"></div>
       </section>
@@ -1823,7 +1823,7 @@ function renderListHead() {
   if (!isDrafts) h2 += `<button class="ibtn only-m lh-more" data-act="m-sheet" title="خيارات القائمة">${ico('more')}</button>`;
   const mu = $('#m-u'), lf = setting('listFilter'); mu.classList.toggle('hidden', isDrafts || isSaved); mu.classList.toggle('on', lf === 'unread'); mu.dataset.v = lf === 'unread' ? 'all' : 'unread'; mu.title = lf === 'unread' ? 'إظهار الكل' : 'غير المقروء فقط';
   $('#m-q').classList.toggle('hidden', isDrafts); $('#m-r').classList.toggle('hidden', isDrafts);
-  if (QUERY) $('#main > .list').classList.add('srch');
+  if (QUERY) $('#main').classList.add('srch');
   $('#list-h').innerHTML = h; $('#list-h2').innerHTML = h2;
   $('.lh-s').classList.toggle('hidden', isDrafts); $('.lh-r').classList.toggle('hidden', isDrafts);
 }
@@ -1831,7 +1831,7 @@ function renderListHead() {
 function renderList() {
   const m = $('#main'), dash = fullPage();
   m.classList.toggle('dash-mode', dash);
-  if (dash) { m.classList.remove('cards-mode'); m.classList.add('pop'); return VIEW.type === 'trend' ? renderTrend($('#dash')) : renderDash($('#dash')); }
+  if (dash) { $('#m-u').classList.add('hidden'); $('#m-q').classList.remove('hidden'); $('#m-r').classList.remove('hidden'); m.classList.remove('cards-mode'); m.classList.add('pop'); return VIEW.type === 'trend' ? renderTrend($('#dash')) : renderDash($('#dash')); }
   renderListHead();
   const box = $('#items');
   const cards = setting('view') === 'cards' && VIEW.type !== 'drafts';
@@ -3819,8 +3819,8 @@ document.addEventListener('click', async e => {
     const it = SEL && getItem(SEL);
     switch (act) {
       case 'toggle-side': $('#side').classList.toggle('open'); break;
-      case 'm-search': $('#main > .list').classList.add('srch'); $('#q').focus(); break;
-      case 'm-search-x': $('#main > .list').classList.remove('srch'); if (QUERY || $('#q').value) { $('#q').value = ''; QUERY = ''; renderList(); } break;
+      case 'm-search': if (fullPage() || VIEW.type === 'drafts') setView({ type: 'all' }); $('#main').classList.add('srch'); $('#q').focus(); break;
+      case 'm-search-x': $('#main').classList.remove('srch'); if (QUERY || $('#q').value) { $('#q').value = ''; QUERY = ''; renderList(); } break;
       case 'm-sheet': mSheet(); break;
       case 'm-sort': Store.write('settings/sort', t.dataset.v); renderList(); break;
       case 'refresh': refreshAll(); break;
