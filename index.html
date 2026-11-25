@@ -103,6 +103,11 @@ body.feed-dragging .nav-i:hover{background:none}
 .nav-i .fico{display:grid}
 .nav-i .sw{width:10px;height:10px;border-radius:50%;flex:none;margin:0 3px}
 .nav-i.off{opacity:.5}
+.nav-i.paused .lbl,.nav-i.paused .fav{opacity:.45}
+.nav-i .pz{width:14px;height:14px;flex:none;color:var(--tx3)}
+.lh-pz{display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--tx3);white-space:nowrap}
+.lh-pz .ico{width:14px;height:14px}
+.lh-pz .lnk{color:var(--ac);font-weight:600}
 .nav-i .err{width:7px;height:7px;border-radius:50%;background:var(--danger);flex:none}
 .side h4{margin:16px 10px 6px;font-size:12px;color:var(--tx3);font-weight:600;display:flex;align-items:center;justify-content:space-between}
 .side h4 span{display:flex;gap:2px}
@@ -745,6 +750,8 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
   <symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
   <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
   <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3c.6 3.2 4.8 5.3 4.8 10.1A4.8 4.8 0 0 1 12 18a4.8 4.8 0 0 1-4.8-4.9c0-2.3 1.3-3.6 2.3-4.6.3 1.5 1 2.4 1.9 2.8C11.9 9 11.4 5.8 12 3Z"/><path d="M12 21v0"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="3.5" height="14" rx="1"/><rect x="14" y="5" width="3.5" height="14" rx="1"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5Z"/></symbol>
   <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
 </svg>
 
@@ -900,7 +907,7 @@ const Store = {
         this.db.ref(`users/${USER.uid}/${k}`).on('value', s => {
           if (first) { first = false; return; }
           S[k] = s.val() || (k === 'settings' ? { ...DEFAULT_SETTINGS } : {});
-          if (k === 'feeds') { /* مصدر أُضيف من جهاز آخر */ Object.keys(S.feeds).forEach(id => { if (!FEED_STATUS[id]) refreshFeed(id); }); }
+          if (k === 'feeds') { /* مصدر أُضيف من جهاز آخر */ Object.keys(S.feeds).forEach(id => { if (!FEED_STATUS[id] && !isPaused(S.feeds[id])) refreshFeed(id); }); }
           scheduleRender(k); saveSnap();
         });
       });
@@ -1381,8 +1388,15 @@ async function refreshFeed(feedId) {
   scheduleRender();
 }
 
+// الإيقاف المؤقت لمصدر: feeds/<id>/paused = { at, until } (until = 0 حتى يُستأنف يدوياً). أخباره تبقى، ولا يُجلب جديد
+const isPaused = f => !!(f && f.paused && (!f.paused.until || Date.now() < f.paused.until));
+const pauseText = f => f.paused.until ? 'موقوف حتى ' + new Date(f.paused.until).toLocaleString('ar', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : 'موقوف مؤقتاً حتى تستأنفه';
+function setPause(id, ms) { Store.write('feeds/' + id + '/paused', ms == null ? null : { at: Date.now(), until: ms ? Date.now() + ms : 0 }); if (ms != null) delete FEED_STATUS[id]; renderAll(); }
 async function refreshAll() {
-  if (REFRESHING) return; const ids = Object.keys(S.feeds); if (!ids.length) return;
+  if (REFRESHING) return;
+  // انتهت مدة الإيقاف: يُمسح الحقل فيعود المصدر إلى الجلب العادي
+  Object.entries(S.feeds).forEach(([id, f]) => { if (f.paused && !isPaused(f)) Store.write('feeds/' + id + '/paused', null); });
+  const ids = Object.keys(S.feeds).filter(id => !isPaused(S.feeds[id])); if (!ids.length) return;
   // دون اتصال لا نجرّب الجلب، كي لا تُعلَّم كل المصادر «متوقفة»
   if (!navigator.onLine) { setOffline(true); return; }
   if (!workerUrl()) { showBanner(); return; }
@@ -1770,14 +1784,14 @@ function renderSide(force) {
       : `<div class="side-foot">لا وسوم بعد. أضف وسماً لأي مقالة من زر ${ico('tag')} في شريطها.</div>`;
   } else {
     const feedRow = ([id, f]) => {
-      const n = UC.feed[id] || 0; const err = FEED_STATUS[id] && FEED_STATUS[id].error;
-      return `<div class="nav-i${act('feed', id)}${n ? ' has-unread' : ''}" data-view="feed" data-id="${esc(id)}" data-drag="feed" title="${esc(err || f.url)}">
+      const n = UC.feed[id] || 0, pz = isPaused(f), err = !pz && FEED_STATUS[id] && FEED_STATUS[id].error;
+      return `<div class="nav-i${act('feed', id)}${n ? ' has-unread' : ''}${pz ? ' paused' : ''}" data-view="feed" data-id="${esc(id)}" data-drag="feed" title="${esc(pz ? pauseText(f) : err || f.url)}">
         <img class="fav" src="${esc(favicon(f.siteUrl || f.url))}" alt="" draggable="false" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
-        <span class="lbl">${esc(f.title || hostOf(f.url))}</span>${err ? '<span class="err"></span>' : ''}<span class="cnt">${n || ''}</span>
+        <span class="lbl">${esc(f.title || hostOf(f.url))}</span>${pz ? ico('pause', 'pz') : ''}${err ? '<span class="err"></span>' : ''}<span class="cnt">${n || ''}</span>
         <button class="more" data-act="feed-menu" data-id="${esc(id)}" title="خيارات">${ico('more')}</button></div>`;
     };
     h = `<h4 class="ph" data-drop="root">المصادر <span><button data-act="new-folder" title="مجلد جديد">${ico('folder')}</button> <button data-act="add-feed" title="إضافة مصدر">${ico('plus')}</button></span></h4>`;
-    const errs = Object.keys(S.feeds).filter(id => FEED_STATUS[id] && FEED_STATUS[id].error).length;
+    const errs = Object.keys(S.feeds).filter(id => !isPaused(S.feeds[id]) && FEED_STATUS[id] && FEED_STATUS[id].error).length;
     if (errs) h += `<button class="p-alert" data-act="feed-errors">${ico('alert')}<span>${errs === 1 ? 'مصدر واحد لا يُحدَّث' : errs + ' مصادر لا تُحدَّث'} — اضغط للتفاصيل</span></button>`;
     h += nav('all', 'inbox', 'كل المقالات', total) + nav('trend', 'flame', 'الرائج');
     const folderBlock = ([fid, fo]) => {
@@ -1824,6 +1838,7 @@ function renderListHead() {
   const mu = $('#m-u'), lf = setting('listFilter'); mu.classList.toggle('hidden', isDrafts || isSaved); mu.classList.toggle('on', lf === 'unread'); mu.dataset.v = lf === 'unread' ? 'all' : 'unread'; mu.title = lf === 'unread' ? 'إظهار الكل' : 'غير المقروء فقط';
   $('#m-q').classList.toggle('hidden', isDrafts); $('#m-r').classList.toggle('hidden', isDrafts);
   if (QUERY) $('#main').classList.add('srch');
+  if (VIEW.type === 'feed' && isPaused(S.feeds[VIEW.id])) h = h.replace('</h2>', `</h2><span class="lh-pz">${ico('pause')}${esc(pauseText(S.feeds[VIEW.id]))} <button class="lnk" data-act="feed-resume" data-id="${esc(VIEW.id)}">استئناف</button></span>`);
   $('#list-h').innerHTML = h; $('#list-h2').innerHTML = h2;
   $('.lh-s').classList.toggle('hidden', isDrafts); $('.lh-r').classList.toggle('hidden', isDrafts);
 }
@@ -3158,9 +3173,14 @@ function popMenu(anchor, items) {
   });
 }
 async function feedMenu(anchor, id) {
-  const f = S.feeds[id]; if (!f) return;
-  const k = await popMenu(anchor, [{ k: 'edit', icon: 'pen', label: 'تعديل' }, { k: 'refresh', icon: 'refresh', label: 'تحديث الآن' }, { k: 'read', icon: 'checks', label: 'تعليم الكل كمقروء' }, { k: 'rule', icon: 'filter', label: 'قاعدة لهذا المصدر' }, { k: 'site', icon: 'ext', label: 'فتح الموقع' }, '-', { k: 'del', icon: 'trash', label: 'إلغاء المتابعة', danger: true }]);
+  const f = S.feeds[id]; if (!f) return; const pz = isPaused(f);
+  const k = await popMenu(anchor, [{ k: 'edit', icon: 'pen', label: 'تعديل' }, { k: 'refresh', icon: 'refresh', label: pz ? 'جلب مرة واحدة' : 'تحديث الآن' }, pz ? { k: 'resume', icon: 'play', label: 'استئناف الجلب' } : { k: 'pause', icon: 'pause', label: 'إيقاف مؤقت…' }, { k: 'read', icon: 'checks', label: 'تعليم الكل كمقروء' }, { k: 'rule', icon: 'filter', label: 'قاعدة لهذا المصدر' }, { k: 'site', icon: 'ext', label: 'فتح الموقع' }, '-', { k: 'del', icon: 'trash', label: 'إلغاء المتابعة', danger: true }]);
   if (k === 'edit') editFeed(id);
+  if (k === 'resume') { setPause(id, null); toast('استُؤنف جلب المصدر'); refreshFeed(id); }
+  if (k === 'pause') {
+    const d = await popMenu(anchor, [{ k: '0', icon: 'pause', label: 'حتى أستأنفه بنفسي' }, { k: '86400000', icon: 'clock', label: 'يوماً واحداً' }, { k: '604800000', icon: 'clock', label: 'أسبوعاً' }, { k: '2592000000', icon: 'clock', label: '30 يوماً' }]);
+    if (d != null) { setPause(id, Number(d)); toast('أُوقف المصدر مؤقتاً — أخباره السابقة باقية'); }
+  }
   if (k === 'refresh') { await refreshFeed(id); const e = FEED_STATUS[id].error; toast(e ? 'خطأ: ' + e : 'حُدِّث المصدر'); }
   if (k === 'read') { const prev = VIEW; VIEW = { type: 'feed', id }; markAllRead(); VIEW = prev; }
   if (k === 'rule') editRule(null, { scope: 'feed:' + id });
@@ -3867,6 +3887,7 @@ document.addEventListener('click', async e => {
       case 'new-folder': newFolder(); break;
       case 'fo-save': saveFolder(); break;
       case 'feed-menu': feedMenu(t, id); break;
+      case 'feed-resume': setPause(id, null); toast('استُؤنف جلب المصدر'); refreshFeed(id); break;
       case 'folder-menu': folderMenu(t, id); break;
       case 'toggle-folder': collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id); lsSet('s24r_collapsed', [...collapsed]); renderSide(); break;
       case 'ef-save': {
