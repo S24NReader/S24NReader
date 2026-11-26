@@ -790,7 +790,7 @@ const CONFIG = {
     projectId: "xxx", appId: "..."
   },*/
   MAX_ITEMS_PER_FEED: 200,
-  CONCURRENCY: 4,
+  CONCURRENCY: 8,
   SUGGESTED: [
     { title: 'سوريا 24', url: 'https://www.syria24.news/feeds/posts/default?alt=rss' },
     { title: 'بي بي سي عربي', url: 'https://feeds.bbci.co.uk/arabic/rss.xml' },
@@ -1275,6 +1275,7 @@ function bigImg(u) {
 }
 function firstImg(html, base) { const m = /<img[^>]+src=["']([^"']+)/i.exec(html || ''); return m ? absUrl(m[1], base) : ''; }
 /* ---------- صورة البطاقة من og:image حين تخلو الخلاصة من صورة ---------- */
+const FEED_SIG = {}; // بصمة آخر نص خلاصة لكل مصدر
 const OG_Q = [], OG_BUSY = new Set(), OG_SAVE = {}; let OG_RUN = 0, OG_IO = null;
 function watchThumbs(box) {
   if (!('IntersectionObserver' in window)) return;
@@ -1308,13 +1309,13 @@ async function dateFetch(id) {
   const it0 = ITEMS.get(id); if (!it0 || it0.dChk || !it0.link) return;
   let d, fu;
   try { const r = await fetchText(it0.link); fu = r.finalUrl; d = new DOMParser().parseFromString(r.text, 'text/html'); }
-  catch (e) { const x = ITEMS.get(id); if (x) { x.dErr = 'تعذّر جلب الصفحة: ' + e.message; ogSave(x.feedId); scheduleRender(); } return; } // نعيد المحاولة في تحديث لاحق
+  catch (e) { const x = ITEMS.get(id); if (x) { x.dErr = 'تعذّر جلب الصفحة: ' + e.message; ogSave(x.feedId); refreshRender(); } return; } // نعيد المحاولة في تحديث لاحق
   const it = ITEMS.get(id) || it0; it.dChk = 1;
   DATE_HOST = hostOf(fu || it0.link); const t = pageDate(d);
   if (t) { it.pDate = Math.min(t, Date.now() + 3600e3); it.date = it.pDate; it.est = 0; it.dErr = ''; }
   else it.dErr = 'لم يُعثر على تاريخ في صفحة المقالة';
   if (!it.image && !it.noImg) { const m = d.querySelector('meta[property="og:image"],meta[name="twitter:image"]'); const img = m ? absUrl(m.getAttribute('content') || '', fu) : ''; if (img) it.image = bigImg(img); }
-  ogSave(it.feedId); scheduleRender();
+  ogSave(it.feedId); refreshRender();
 }
 // الخبر نفسه من مصدرين (RSS وصفحة قسم): يظهر مرة واحدة، والأولوية لنسخة RSS
 const linkKey = u => { try { const x = new URL(u); return (x.hostname.replace(/^www\./, '') + decodeURIComponent(x.pathname).replace(/\/+$/, '')).toLowerCase(); } catch { return u || ''; } };
@@ -1329,7 +1330,7 @@ function dedupeByLink(list) {
 }
 function ogSave(fid) {
   META_VER++; clearTimeout(OG_SAVE[fid]);
-  OG_SAVE[fid] = setTimeout(() => IDB.put({ feedId: fid, items: [...ITEMS.values()].filter(i => i.feedId === fid), fetchedAt: (FEED_STATUS[fid] || {}).fetchedAt || Date.now() }), 1500);
+  OG_SAVE[fid] = setTimeout(() => IDB.put({ feedId: fid, items: [...ITEMS.values()].filter(i => i.feedId === fid), fetchedAt: (FEED_STATUS[fid] || {}).fetchedAt || Date.now(), sig: FEED_SIG[fid] }), 1500);
 }   
 
 /* ---------- استخراج النص الكامل من صفحة المقالة ---------- */
@@ -1353,6 +1354,14 @@ async function refreshFeed(feedId) {
   FEED_STATUS[feedId] = { ...(FEED_STATUS[feedId] || {}), loading: true };
   try {
     const { text, finalUrl } = await fetchText(feed.url, { feed: true }); DATE_HOST = hostOf(finalUrl);
+    // الخلاصة لم تتغير منذ آخر جلب: لا نعيد تحليل أخبارها وتنقيتها (أثقل ما في التحديث)
+    const sig = hash(finalUrl + '|' + text);
+    const kept = FEED_SIG[feedId] === sig && !FEED_STATUS[feedId].error ? [...ITEMS.values()].filter(i => i.feedId === feedId) : [];
+    if (kept.length) {
+      const now = Date.now(); FEED_STATUS[feedId] = { fetchedAt: now, error: '', loading: false };
+      IDB.put({ feedId, items: kept, fetchedAt: now, sig });
+      return refreshRender();
+    }
     const p = parseDoc(text, finalUrl);
     let raw;
     if (feed.type !== 'html' && p.kind === 'html') throw new Error('الرابط لا يعيد خلاصة RSS صالحة');
@@ -1382,20 +1391,23 @@ async function refreshFeed(feedId) {
     const items = [...prevMap.values()].sort((a, b) => b.date - a.date).slice(0, CONFIG.MAX_ITEMS_PER_FEED);
     for (const it of ITEMS.values()) if (it.feedId === feedId) ITEMS.delete(it.id);
     items.forEach(it => { ITEMS.set(it.id, it); if (it.full && !FULLTEXT.has(it.id)) FULLTEXT.set(it.id, it.full); }); ITEMS_VER++;
-    IDB.put({ feedId, items, fetchedAt: now });
+    FEED_SIG[feedId] = sig; IDB.put({ feedId, items, fetchedAt: now, sig });
     FEED_STATUS[feedId] = { fetchedAt: now, error: '', loading: false };
     if (fresh.length) applyRuleActions(fresh);
     if (feed.type === 'html') { items.filter(it => it.est && !it.dChk).slice(0, 30).forEach(it => DATE_Q.push(it.id)); datePump(); }
   } catch (e) {
     FEED_STATUS[feedId] = { ...(FEED_STATUS[feedId] || {}), error: e.message, loading: false };
   }
-  scheduleRender();
+  refreshRender();
 }
 
 // الإيقاف المؤقت لمصدر: feeds/<id>/paused = { at, until } (until = 0 حتى يُستأنف يدوياً). أخباره تبقى، ولا يُجلب جديد
 const isPaused = f => !!(f && f.paused && (!f.paused.until || Date.now() < f.paused.until));
 const pauseText = f => f.paused.until ? 'موقوف حتى ' + new Date(f.paused.until).toLocaleString('ar', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : 'موقوف مؤقتاً حتى تستأنفه';
 function setPause(id, ms) { Store.write('feeds/' + id + '/paused', ms == null ? null : { at: Date.now(), until: ms ? Date.now() + ms : 0 }); if (ms != null) delete FEED_STATUS[id]; renderAll(); }
+// أثناء جلب المصادر تُجمع إعادة الرسم في دفعة كل 700ms بدل رسمة بعد كل مصدر
+let _rfT = 0, _rfAt = 0;
+function refreshRender() { if (_rfT) return; _rfT = setTimeout(() => { _rfT = 0; _rfAt = Date.now(); scheduleRender(); }, Math.max(0, 700 - (Date.now() - _rfAt))); }
 async function refreshAll() {
   if (REFRESHING) return;
   // انتهت مدة الإيقاف: يُمسح الحقل فيعود المصدر إلى الجلب العادي
@@ -1405,7 +1417,9 @@ async function refreshAll() {
   if (!navigator.onLine) { setOffline(true); return; }
   if (!workerUrl()) { showBanner(); return; }
   REFRESHING = true; $$('.refresh-ico').forEach(e => e.classList.add('spin'));
-  const q = [...ids];
+  // مصادر الصفحة المفتوحة أولاً، ثم الأقدم تحديثاً
+  const mine = id => VIEW.type === 'feed' ? VIEW.id === id : VIEW.type === 'folder' ? inFolder(S.feeds[id].folder, VIEW.id) : false;
+  const q = ids.map(id => [id, mine(id) ? 0 : 1, (FEED_STATUS[id] || {}).fetchedAt || 0]).sort((a, b) => a[1] - b[1] || a[2] - b[2]).map(x => x[0]);
   await Promise.all(Array.from({ length: Math.min(CONFIG.CONCURRENCY, q.length) }, async () => { while (q.length) await refreshFeed(q.shift()); }));
   REFRESHING = false; $$('.refresh-ico').forEach(e => e.classList.remove('spin'));
   lsSet('s24r_last_refresh', Date.now());
@@ -1819,7 +1833,7 @@ function renderSide(force) {
       : `<div class="nav-i" data-act="rule-new">${ico('filter')}<span class="lbl">أنشئ أول فلتر…</span></div>`;
   }
   if (!USER) h += `<div class="side-foot">وضع محلي — البيانات في هذا المتصفح</div>`;
-  $('#side').innerHTML = h;
+  setHtml($('#side'), h, force || DRAG);
 }
 
 function renderListHead() {
@@ -1843,7 +1857,7 @@ function renderListHead() {
   $('#m-q').classList.toggle('hidden', isDrafts); $('#m-r').classList.toggle('hidden', isDrafts);
   if (QUERY) $('#main').classList.add('srch');
   if (VIEW.type === 'feed' && isPaused(S.feeds[VIEW.id])) h = h.replace('</h2>', `</h2><span class="lh-pz">${ico('pause')}${esc(pauseText(S.feeds[VIEW.id]))} <button class="lnk" data-act="feed-resume" data-id="${esc(VIEW.id)}">استئناف</button></span>`);
-  $('#list-h').innerHTML = h; $('#list-h2').innerHTML = h2;
+  setHtml($('#list-h'), h); setHtml($('#list-h2'), h2);
   $('.lh-s').classList.toggle('hidden', isDrafts); $('.lh-r').classList.toggle('hidden', isDrafts);
 }
 
@@ -1857,8 +1871,8 @@ function renderList() {
   box.classList.toggle('cards', cards); m.classList.toggle('cards-mode', cards); m.classList.toggle('pop', cards);
   if (VIEW.type === 'drafts') return renderDraftList(box);
   const list = currentItems();
-  if (!list.length) { box.innerHTML = emptyState(); return; }
-  box.innerHTML = list.slice(0, 600).map(it => {
+  if (!list.length) { box.innerHTML = emptyState(); box._h = null; return; }
+  patchList(box, list.slice(0, 600).map(it => {
     const f = S.feeds[it.feedId] || { title: it.feedTitle || '' }; const s = st(it.id); const m = matchRules(it);
     const pinned = ['all', 'folder', 'feed', 'rule'].includes(VIEW.type) && !s.r && isPinned(it);
     const hl = m.find(r => r.action === 'highlight');
@@ -1884,9 +1898,27 @@ function renderList() {
         <button class="ia${s.l ? ' on' : ''}" data-act="it-later" data-id="${id}" title="${s.l ? 'إزالة من «للقراءة لاحقاً»' : 'حفظ للقراءة لاحقاً'}">${ico('clock')}</button>
       </div>
     </div>`;
-  }).join('');
+  }));
   if (cards) watchThumbs(box);
 }
+// تحديث القائمة دون هدم البطاقات التي لم تتغير: تبقى صورها محمّلة وحالة المؤشر عليها، فلا ترتجف أثناء جلب المصادر
+const _tpl = document.createElement('template');
+function patchList(box, rows) {
+  const want = new Map(); rows.forEach(h => { const m = /data-item="([^"]*)"/.exec(h); want.set(m ? m[1] : h, h); });
+  const keep = new Map();
+  for (const n of [...box.childNodes]) {
+    const id = n._h != null && n.dataset ? n.dataset.item : null;
+    if (id != null && want.get(id) === n._h && !keep.has(id)) keep.set(id, n); else n.remove();
+  }
+  let cur = box.firstChild;
+  for (const [id, h] of want) {
+    let el = keep.get(id);
+    if (el) { const c = /^<div class="([^"]*)"/.exec(h); if (c && el.className !== c[1].replace(/&amp;/g, '&')) el.className = c[1]; } // ما غيّرته الصفحة مباشرة (مثل sel)
+    else { _tpl.innerHTML = h; el = _tpl.content.firstElementChild; el._h = h; }
+    if (el === cur) cur = cur.nextSibling; else box.insertBefore(el, cur);
+  }
+}
+const setHtml = (el, h, force) => { if (force || el._h !== h) { el.innerHTML = h; el._h = h; } };
 
 function welcomeHtml() {
     return `<div class="empty">${ico('rss')}<h3>أهلاً بك في ${esc(CONFIG.APP_NAME)}</h3>
@@ -3862,7 +3894,7 @@ function cleanupFeedDrag() {
   if (d.ghost) d.ghost.remove(); if (d.line) d.line.remove();
   document.body.classList.remove('feed-dragging');
   const redraw = d.on || d.pending; DRAG = null;
-  if (redraw) renderSide();   // لا نعيد الرسم بعد نقرة عادية حتى لا يضيع حدث النقر
+  if (redraw) renderSide(true);   // لا نعيد الرسم بعد نقرة عادية حتى لا يضيع حدث النقر
 }
 function cancelFeedDrag() { if (DRAG && DRAG.on) { DRAG_CLICK_BLOCK = true; setTimeout(() => DRAG_CLICK_BLOCK = false, 0); } cleanupFeedDrag(); }
 function endFeedDrag(e) {
@@ -4073,7 +4105,7 @@ async function start() {
   try { await Store.load(); } catch (e) { STARTED = false; return gateScreen('error', e.message); }
   for (const c of cached) {
     if (!S.feeds[c.feedId]) { IDB.del(c.feedId); continue; }
-    FEED_STATUS[c.feedId] = { fetchedAt: c.fetchedAt, error: '' };
+    FEED_STATUS[c.feedId] = { fetchedAt: c.fetchedAt, error: '' }; if (c.sig != null) FEED_SIG[c.feedId] = c.sig;
     (c.items || []).forEach(it => { ITEMS.set(it.id, it); if (it.full) FULLTEXT.set(it.id, it.full); });
   }
   ITEMS_VER++;
