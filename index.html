@@ -370,6 +370,21 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
 .main.pop.reading .r-nav:hover,.main.pop.reading .r-x:hover{background:rgba(255,255,255,.25)}
 .main.pop.reading .r-nav.prev{right:14px}
 .main.pop.reading .r-nav.next{left:14px}
+/* على طريقة Inoreader: خلفية أعتم، والأزرار بيضاء واضحة بجانب النافذة لا عند حافة الشاشة */
+.main.pop.reading .reader{background:rgba(6,10,8,.72)}
+.main.pop.reading .r-x,.main.pop.reading .r-nav{background:none;color:#fff;opacity:.9}
+.main.pop.reading .r-x:hover,.main.pop.reading .r-nav:hover{opacity:1;background:rgba(255,255,255,.16)}
+.main.pop.reading .r-nav{width:52px;height:52px}
+.main.pop.reading .r-nav .ico{width:34px;height:34px;stroke-width:1.6}
+.main.pop.reading .r-x{top:22px;width:44px;height:44px;left:max(12px,calc(50% - 460px - 60px))}
+.main.pop.reading .r-x .ico{width:28px;height:28px}
+.main.pop.reading .r-nav.prev{right:max(10px,calc(50% - 460px - 68px))}
+.main.pop.reading .r-nav.next{left:max(10px,calc(50% - 460px - 68px))}
+/* زر الأخبار الجديدة أعلى القائمة */
+.new-wrap{position:relative;height:0;z-index:6}
+.new-pill{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;white-space:nowrap;padding:7px 14px 7px 16px;border-radius:999px;background:var(--ac);color:#fff;font:inherit;font-size:13.5px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.22);cursor:pointer;animation:fade .15s}
+.new-pill:hover{filter:brightness(1.08)}
+.new-pill .ico{width:16px;height:16px}
 @media (max-width:760px){
   .main.pop.reading .reader{padding:0}
   .main.pop.reading .r-wrap{border-radius:0}
@@ -686,7 +701,7 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
       <aside class="side" id="side"></aside>
       <section class="list">
         <div class="list-h"><div id="list-h"></div><div class="search lh-s"><svg class="ico"><use href="#i-search"/></svg><input id="q" type="search" placeholder="ابحث في المقالات…  ( / )" autocomplete="off"></div><button class="ibtn only-m lh-x" data-act="m-search-x" title="إغلاق البحث"><svg class="ico"><use href="#i-x"/></svg></button><div id="list-h2"></div><button class="ibtn lh-r" data-act="refresh" title="تحديث (r)"><svg class="ico refresh-ico" id="refresh-ico"><use href="#i-refresh"/></svg></button></div>
-        <div class="items" id="items"></div>
+        <div class="new-wrap"><button class="new-pill hidden" id="new-pill" data-act="show-new"></button></div><div class="items" id="items"></div>
       </section>
       <section class="reader" id="reader"></section>
       <section class="dash" id="dash"></section>
@@ -1394,6 +1409,7 @@ async function refreshFeed(feedId) {
     FEED_SIG[feedId] = sig; IDB.put({ feedId, items, fetchedAt: now, sig });
     FEED_STATUS[feedId] = { fetchedAt: now, error: '', loading: false };
     if (fresh.length) applyRuleActions(fresh);
+    if (TOUCHED && !MANUAL && prevMap.size > fresh.length) fresh.forEach(it => HELD.add(it.id)); // مصدر جديد بلا أخبار سابقة يدخل مباشرة
     if (feed.type === 'html') { items.filter(it => it.est && !it.dChk).slice(0, 30).forEach(it => DATE_Q.push(it.id)); datePump(); }
   } catch (e) {
     FEED_STATUS[feedId] = { ...(FEED_STATUS[feedId] || {}), error: e.message, loading: false };
@@ -1407,6 +1423,12 @@ const pauseText = f => f.paused.until ? 'موقوف حتى ' + new Date(f.paused
 function setPause(id, ms) { Store.write('feeds/' + id + '/paused', ms == null ? null : { at: Date.now(), until: ms ? Date.now() + ms : 0 }); if (ms != null) delete FEED_STATUS[id]; renderAll(); }
 // أثناء جلب المصادر تُجمع إعادة الرسم في دفعة كل 700ms بدل رسمة بعد كل مصدر
 let _rfT = 0, _rfAt = 0;
+// الأخبار الجديدة بعد أن يبدأ القارئ التصفح تُحجز (HELD) ولا تدخل القائمة حتى يضغط زر «N خبراً جديداً»، فلا تتحرك البطاقات تحت يده.
+// TOUCHED: لمس القائمة (تمرير/مؤشر/فتح خبر) منذ آخر انتقال. MANUAL: تحديث طلبه بنفسه (⟳ أو r) فيدخل الجديد مباشرة.
+const HELD = new Set(); let TOUCHED = false, MANUAL = false;
+function manualRefresh() { HELD.clear(); scheduleRender(); MANUAL = true; if (!REFRESHING) refreshAll().finally(() => { MANUAL = false; }); }
+function showNew() { HELD.clear(); renderList(); $('#items').scrollTop = 0; }
+['wheel', 'touchstart', 'pointerdown', 'pointermove', 'keydown'].forEach(ev => $('#items').addEventListener(ev, () => { TOUCHED = true; }, { passive: true }));
 function refreshRender() { if (_rfT) return; _rfT = setTimeout(() => { _rfT = 0; _rfAt = Date.now(); scheduleRender(); }, Math.max(0, 700 - (Date.now() - _rfAt))); }
 async function refreshAll() {
   if (REFRESHING) return;
@@ -1421,7 +1443,7 @@ async function refreshAll() {
   const mine = id => VIEW.type === 'feed' ? VIEW.id === id : VIEW.type === 'folder' ? inFolder(S.feeds[id].folder, VIEW.id) : false;
   const q = ids.map(id => [id, mine(id) ? 0 : 1, (FEED_STATUS[id] || {}).fetchedAt || 0]).sort((a, b) => a[1] - b[1] || a[2] - b[2]).map(x => x[0]);
   await Promise.all(Array.from({ length: Math.min(CONFIG.CONCURRENCY, q.length) }, async () => { while (q.length) await refreshFeed(q.shift()); }));
-  REFRESHING = false; $$('.refresh-ico').forEach(e => e.classList.remove('spin'));
+  REFRESHING = false; MANUAL = false; $$('.refresh-ico').forEach(e => e.classList.remove('spin'));
   lsSet('s24r_last_refresh', Date.now());
   // شرط «نقلته N مصادر» لا يكتمل إلا بعد وصول كل المصادر، فتُعاد القواعد التي فيه على الأخبار الحديثة غير المقروءة
   if (activeRules().some(r => r.dupMin > 1)) { const since = Date.now() - DUP_WIN; applyRuleActions([...ITEMS.values()].filter(it => S.feeds[it.feedId] && !isRead(it.id) && it.date >= since), { post: true }); }
@@ -1727,6 +1749,7 @@ function currentItems(opts = {}) {
       const r = S.rules[VIEW.id]; const pr = r ? prepRule(VIEW.id, r) : null;
       list = pr ? list.filter(it => ruleHit(pr, it)) : [];
     } else list = list.filter(it => !isHidden(it));
+    if (HELD.size && !opts.held) list = list.filter(it => !HELD.has(it.id) || it.id === SEL);
     if (setting('listFilter') === 'unread' && !opts.all) list = list.filter(it => !isRead(it.id) || it.id === SEL || KEEP_VIS.has(it.id));
     list = dedupeByLink(list);
     if (VIEW.type !== 'feed') list = groupDupes(list);
@@ -1842,7 +1865,7 @@ function renderListHead() {
   if (isDrafts) h += `<button class="btn sm" data-act="new-draft">${ico('plus')}مسودة</button>`;
   else {
     if (!isSaved) {
-      const un = currentItems({ all: true }).filter(it => !isRead(it.id)).length; h = h.replace('</h2>', `</h2><span class="lh-n only-m">${un ? fmtN(un) + ' غير مقروءة' : 'لا جديد'}</span>`);
+      const un = currentItems({ all: true, held: true }).filter(it => !isRead(it.id)).length; h = h.replace('</h2>', `</h2><span class="lh-n only-m">${un ? fmtN(un) + ' غير مقروءة' : 'لا جديد'}</span>`);
       h += `<span class="ma-g"><button class="btn sm ma" data-act="mark-all" title="تعليم الكل كمقروء">${ico('checks')}<span class="t">تعليم الكل كمقروء</span></button><button class="btn sm ma-dd" data-act="mark-menu" title="خيارات التعليم">${ico('chev', 'dn')}</button></span>`;
       h += `<div class="seg"><button data-act="lf" data-v="unread" class="${setting('listFilter') === 'unread' ? 'on' : ''}">غير المقروء${un ? ` <b>${fmtN(un)}</b>` : ''}</button><button data-act="lf" data-v="all" class="${setting('listFilter') === 'all' ? 'on' : ''}">الكل</button></div>`;
     }
@@ -1871,6 +1894,8 @@ function renderList() {
   box.classList.toggle('cards', cards); m.classList.toggle('cards-mode', cards); m.classList.toggle('pop', cards);
   if (VIEW.type === 'drafts') return renderDraftList(box);
   const list = currentItems();
+  const nNew = HELD.size ? currentItems({ held: true }).length - list.length : 0, pill = $('#new-pill');
+  pill.classList.toggle('hidden', nNew < 1); if (nNew > 0) pill.innerHTML = `${ico('up')}<span>${nNew === 1 ? 'خبر جديد' : nNew === 2 ? 'خبران جديدان' : fmtN(nNew) + (nNew <= 10 ? ' أخبار جديدة' : ' خبراً جديداً')}</span>`;
   if (!list.length) { box.innerHTML = emptyState(); box._h = null; return; }
   patchList(box, list.slice(0, 600).map(it => {
     const f = S.feeds[it.feedId] || { title: it.feedTitle || '' }; const s = st(it.id); const m = matchRules(it);
@@ -2452,14 +2477,14 @@ addEventListener('pointerdown', () => { if (!EXIT_AT) navArm(); }, true);
 
 function setView(v, sel = null) {
   navPush();
-  VIEW = v; SEL = sel; KEEP_VIS.clear(); if (v.type !== 'dash' && v.type !== 'trend') DASH_CTX = [];
+  VIEW = v; SEL = sel; KEEP_VIS.clear(); HELD.clear(); TOUCHED = false; if (v.type !== 'dash' && v.type !== 'trend') DASH_CTX = [];
   $('#main').classList.toggle('reading', !!sel);
   $('#side').classList.remove('open');
   renderAll(); $('#items').scrollTop = 0; $('#dash').scrollTop = 0;
 }
 function openItem(id) {
   if (!SEL) navPush(); // من القائمة إلى مقالة خطوة؛ التنقل بين المقالات ليس خطوة
-  SEL = id; KEEP_VIS.add(id); $('#main').classList.add('reading');
+  SEL = id; KEEP_VIS.add(id); TOUCHED = true; $('#main').classList.add('reading');
   if (setting('autoRead') && !isRead(id)) setFlag(id, 'r', true);
   popSchedule(id);
   renderList(); renderReader();
@@ -3934,7 +3959,8 @@ document.addEventListener('click', async e => {
       case 'm-search-x': $('#main').classList.remove('srch'); if (QUERY || $('#q').value) { $('#q').value = ''; QUERY = ''; renderList(); } break;
       case 'm-sheet': mSheet(); break;
       case 'm-sort': Store.write('settings/sort', t.dataset.v); renderList(); break;
-      case 'refresh': refreshAll(); break;
+      case 'refresh': manualRefresh(); break;
+      case 'show-new': showNew(); break;
       case 'refresh-one': refreshFeed(id); break;
       case 'add-feed': openAddFeed(); break;
       case 'quick-add': quickAdd(t.dataset.url, t.dataset.title); break;
@@ -4073,7 +4099,7 @@ document.addEventListener('keydown', e => {
     case 'v': if (it) window.open(it.link, '_blank', 'noopener'); break;
     case 'd': if (it) itemToDraft(it); break;
     case 't': if (it) { const b = $('[data-act="tags-pop"]'); if (b) { e.preventDefault(); tagsPop(b); } } break;
-    case 'r': refreshAll(); break;
+    case 'r': manualRefresh(); break;
     case 'z': if (UNDO) UNDO(); break;
     case '/': e.preventDefault(); railGo('search'); break;
     case 'Escape': if (document.querySelector('.tagpop,.menu')) { document.querySelectorAll('.tagpop,.menu').forEach(m => m.remove()); break; } if (SEL) closeReader(); break;
