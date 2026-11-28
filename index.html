@@ -127,6 +127,7 @@ body.feed-dragging .nav-i:hover{background:none}
 .list-h h2{margin:0;font-size:16px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:2px}
 .seg button{padding:3px 9px;border-radius:6px;font-size:12.5px;color:var(--tx2)}
+.lh-day{position:relative;display:inline-flex;align-items:center}.lh-day select{font:inherit;font-size:12.5px;color:var(--tx2);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:3px 6px;cursor:pointer;max-width:150px}.lh-day.on select{color:#fff;background:var(--ac);border-color:var(--ac)}.lh-day input{position:absolute;inset:0;opacity:0;pointer-events:none}
 .seg button.on{background:var(--panel);color:var(--tx);box-shadow:0 1px 2px rgba(0,0,0,.08);font-weight:600}
 .items{overflow:auto;flex:1}
 .it{display:flex;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line2);cursor:pointer;position:relative}
@@ -553,7 +554,7 @@ textarea.in{height:auto;min-height:80px;padding:10px 12px;resize:vertical}
   .list-h{flex-wrap:nowrap;align-items:flex-end;padding:2px 16px 12px;min-height:0}
   #list-h{display:block;flex:1;min-width:0}
   #list-h h2{font-size:23px}
-  #list-h .ma-g,#list-h .seg,#list-h2>:not(.lh-more),.lh-r{display:none!important}
+  #list-h .ma-g,#list-h .seg,#list-h2>:not(.lh-more):not(.lh-day),.lh-r{display:none!important}
   .lh-n{display:block;font-size:13px;color:var(--tx3);margin-top:2px}
   .main:not(.srch) .lh-s,.main:not(.srch) .lh-x{display:none}
   .content:has(.main.srch) .mhd,.content:has(.main.reading) .mhd,.main.srch #list-h,.main.srch #list-h2{display:none}
@@ -1732,6 +1733,15 @@ function unreadCounts() {
   return { feed, folder, rule, total };
 }
 
+// تحديد يوم لعرض أخباره (بتوقيت الجهاز): مؤقت لكل قسم، يعود إلى «كل الأيام» عند مغادرته (setView)
+let DAY = ''; // '' أو 'YYYY-MM-DD'
+const dayKey = (off = 0) => { const d = new Date(); d.setDate(d.getDate() - off); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const dayRange = k => { const [y, m, d] = k.split('-').map(Number); return [new Date(y, m - 1, d).getTime(), new Date(y, m - 1, d + 1).getTime()]; };
+const dayLabel = k => k === dayKey(0) ? 'اليوم' : k === dayKey(1) ? 'أمس' : k === dayKey(2) ? 'أول أمس' : new Date(dayRange(k)[0]).toLocaleDateString('ar', { weekday: 'short', day: 'numeric', month: 'short' });
+function dayPick() {
+  const ks = [dayKey(0), dayKey(1), dayKey(2)], o = (v, t) => `<option value="${v}"${DAY === v ? ' selected' : ''}>${t}</option>`;
+  return `<span class="lh-day${DAY ? ' on' : ''}" title="أخبار يوم محدد"><select data-day>${o('', 'كل الأيام')}${o(ks[0], 'اليوم')}${o(ks[1], 'أمس')}${o(ks[2], 'أول أمس')}${DAY && !ks.includes(DAY) ? o(DAY, dayLabel(DAY)) : ''}<option value="pick">تاريخ آخر…</option></select><input type="date" data-day-pick max="${ks[0]}" value="${DAY || ks[0]}"></span>`;
+}
 function currentItems(opts = {}) {
   let list;
   if (VIEW.type === 'dash' || VIEW.type === 'trend') return DASH_CTX.map(getItem).filter(Boolean).map(it => ITEMS.get(it.id) || it);
@@ -1755,6 +1765,7 @@ function currentItems(opts = {}) {
     list = dedupeByLink(list);
     if (VIEW.type !== 'feed') list = groupDupes(list);
   }
+  if (DAY) { const [a, b] = dayRange(DAY); list = list.filter(it => it.date >= a && it.date < b); }
   if (QUERY) { const q = normAr(QUERY); list = list.filter(it => normAr(it.title + ' ' + (it.text || '')).includes(q)); }
   const dir = setting('sort') === 'old' ? 1 : -1;
   if (!['all', 'folder', 'feed', 'rule'].includes(VIEW.type) || !activeRules().some(r => r.action === 'pin')) return list.sort((a, b) => dir * (a.date - b.date));
@@ -1870,6 +1881,7 @@ function renderListHead() {
       h += `<span class="ma-g"><button class="btn sm ma" data-act="mark-all" title="تعليم الكل كمقروء">${ico('checks')}<span class="t">تعليم الكل كمقروء</span></button><button class="btn sm ma-dd" data-act="mark-menu" title="خيارات التعليم">${ico('chev', 'dn')}</button></span>`;
       h += `<div class="seg"><button data-act="lf" data-v="unread" class="${setting('listFilter') === 'unread' ? 'on' : ''}">غير المقروء${un ? ` <b>${fmtN(un)}</b>` : ''}</button><button data-act="lf" data-v="all" class="${setting('listFilter') === 'all' ? 'on' : ''}">الكل</button></div>`;
     }
+    h2 += dayPick();
     h2 += `<div class="seg" title="طريقة العرض"><button data-act="view-mode" data-v="list" class="${setting('view') !== 'cards' ? 'on' : ''}" title="قائمة">${ico('list')}</button><button data-act="view-mode" data-v="cards" class="${setting('view') === 'cards' ? 'on' : ''}" title="بطاقات">${ico('grid')}</button></div>`;
     if (VIEW.type === 'feed' || VIEW.type === 'folder') h2 += `<button class="ibtn" data-act="trend-scope" data-t="${VIEW.type}" data-id="${esc(VIEW.id)}" title="الأكثر قراءة في ${VIEW.type === 'feed' ? 'هذا المصدر' : 'هذا المجلد'}" style="color:var(--heat)">${ico('flame')}</button>`;
     if (VIEW.type === 'feed') h2 += `<button class="ibtn" data-act="feed-menu" data-id="${esc(VIEW.id)}" title="خيارات المصدر">${ico('more')}</button>`;
@@ -1953,6 +1965,7 @@ function welcomeHtml() {
       <div class="sugg">${CONFIG.SUGGESTED.map(s => `<button class="btn sm" data-act="quick-add" data-url="${esc(s.url)}" data-title="${esc(s.title)}">+ ${esc(s.title)}</button>`).join('')}</div></div>`;
 }
 function emptyState() {
+  if (DAY) return `<div class="empty">${ico('clock')}<h3>لا أخبار ${esc(dayLabel(DAY))}</h3><div>${setting('listFilter') === 'unread' ? 'لا أخبار غير مقروءة في هذا اليوم. <span class="lnk" data-act="lf" data-v="all">عرض المقروء أيضاً</span><br>' : ''}يعرض التطبيق ما حُفظ على جهازك فقط (حتى ${CONFIG.MAX_ITEMS_PER_FEED} خبر لكل مصدر).</div></div>`;
   if (!Object.keys(S.feeds).length && VIEW.type === 'all') return welcomeHtml();
   if (QUERY) return `<div class="empty">${ico('search')}<h3>لا نتائج</h3><div>لا توجد مقالات تطابق «${esc(QUERY)}».</div></div>`;
   if (VIEW.type === 'starred') return `<div class="empty">${ico('star')}<h3>لا مقالات مميّزة</h3><div>اضغط النجمة على أي مقالة (أو <span class="kbd">s</span>) لحفظها هنا.</div></div>`;
@@ -2478,7 +2491,7 @@ addEventListener('pointerdown', () => { if (!EXIT_AT) navArm(); }, true);
 
 function setView(v, sel = null) {
   navPush();
-  VIEW = v; SEL = sel; KEEP_VIS.clear(); HELD.clear(); TOUCHED = false; if (v.type !== 'dash' && v.type !== 'trend') DASH_CTX = [];
+  VIEW = v; SEL = sel; KEEP_VIS.clear(); HELD.clear(); TOUCHED = false; DAY = ''; if (v.type !== 'dash' && v.type !== 'trend') DASH_CTX = [];
   $('#main').classList.toggle('reading', !!sel);
   $('#side').classList.remove('open');
   renderAll(); $('#items').scrollTop = 0; $('#dash').scrollTop = 0;
@@ -4082,6 +4095,8 @@ document.addEventListener('submit', e => {
   if (e.target.id === 'au-form') { e.preventDefault(); authAction(e.target.dataset.mode); }
 });
 document.addEventListener('change', e => {
+  if (e.target.hasAttribute('data-day')) { const v = e.target.value; if (v === 'pick') { e.target.value = DAY; const i = e.target.parentNode.querySelector('[data-day-pick]'); try { i.showPicker(); } catch { i.style.pointerEvents = 'auto'; i.focus(); i.click(); } return; } DAY = v; KEEP_VIS.clear(); renderList(); $('#items').scrollTop = 0; }
+  if (e.target.hasAttribute('data-day-pick')) { if (e.target.value) { DAY = e.target.value; KEEP_VIS.clear(); renderList(); $('#items').scrollTop = 0; } }
   if (e.target.hasAttribute('data-ms-on')) { const k = e.target.dataset.msOn, on = e.target.checked; Store.db.ref().update({ [`pop/sites/cfg/${k}/on`]: on, [`pop/sites/data/${k}/on`]: on }).then(() => { MS.cfg[k].on = on; if (POP.sites && POP.sites[k]) POP.sites[k].on = on; $('#ms-list').innerHTML = msRows(); scheduleRender(); }).catch(er => toast(er.message)); }
   if (e.target.hasAttribute('data-rule-toggle')) { Store.write(`rules/${e.target.dataset.id}/enabled`, e.target.checked); scheduleRender(); }
 });
