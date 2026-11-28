@@ -1883,7 +1883,7 @@ function renderListHead() {
     }
     h2 += dayPick();
     h2 += `<div class="seg" title="طريقة العرض"><button data-act="view-mode" data-v="list" class="${setting('view') !== 'cards' ? 'on' : ''}" title="قائمة">${ico('list')}</button><button data-act="view-mode" data-v="cards" class="${setting('view') === 'cards' ? 'on' : ''}" title="بطاقات">${ico('grid')}</button></div>`;
-    if (VIEW.type === 'feed' || VIEW.type === 'folder') h2 += `<button class="ibtn" data-act="trend-scope" data-t="${VIEW.type}" data-id="${esc(VIEW.id)}" title="الأكثر قراءة في ${VIEW.type === 'feed' ? 'هذا المصدر' : 'هذا المجلد'}" style="color:var(--heat)">${ico('flame')}</button>`;
+    if (['feed', 'folder', 'all'].includes(VIEW.type)) h2 += `<button class="ibtn" data-act="trend-scope" data-t="${VIEW.type}" data-id="${esc(VIEW.id || '')}" title="${trScopeTitle()}" style="color:var(--heat)">${ico('flame')}</button>`;
     if (VIEW.type === 'feed') h2 += `<button class="ibtn" data-act="feed-menu" data-id="${esc(VIEW.id)}" title="خيارات المصدر">${ico('more')}</button>`;
     if (VIEW.type === 'tag') h2 += `<button class="ibtn" data-act="tag-menu" data-id="${esc(VIEW.id)}" title="خيارات الوسم">${ico('more')}</button>`;
     if (VIEW.type === 'rule') h2 += `<button class="ibtn" data-act="rule-edit" data-id="${esc(VIEW.id)}" title="تعديل الفلتر">${ico('pen')}</button>`;
@@ -2538,10 +2538,16 @@ const popAk = link => hash('a|' + linkKey(link));
 const popFk = url => url ? hash('f|' + String(url).trim().replace(/^https?:\/\/(www\.)?/i, '').replace(/\/+$/, '').toLowerCase()) : '';
 const popOn = () => Store.mode === 'firebase' && !!USER && !!Store.db;
 const POP_TTL = 10 * 60e3, POP_TOP_TTL = 30 * 60e3, POP_DWELL = 2500;
-const POP = { top: null, topAt: 0, live: {}, feed: {}, sites: null, sitesAt: 0, load: new Set(), err: '', st: null, topLive: 0, watch: false };
+const POP = { top: null, topAt: 0, live: {}, feed: {}, hl: {}, hf: {}, sites: null, sitesAt: 0, load: new Set(), err: '', st: null, topLive: 0, watch: false };
 const VIRT = new Map();           // خبر من الترتيب ليس في مصادر هذا المستخدم: يُفتح في القارئ كأي خبر
 const POP_DONE = lsGet('s24r_popc', {}); // ما حُسب من هذا الجهاز اليوم، كي لا يُرسل طلب ترفضه القواعد
-const TR_DEF = { tab: 'read', per: 'day', hper: 'h24' };
+const TR_DEF = { tab: 'read', per: 'h24', hper: 'h24' };
+// «الأكثر قراءة» بنوافذ متحركة: h6 و h24 من دفعات الساعة (pop/h)، و week من دفعات الأيام (pop/d و pop/top). 'day' القديمة = h24
+const trPer = v => v === 'h6' || v === 'week' ? v : 'h24';
+const trScopeTitle = () => VIEW.type === 'feed' ? 'الرائج في هذا المصدر' : VIEW.type === 'folder' ? 'الرائج في هذا المجلد' : 'الرائج في كل المصادر';
+const utcHour = (t = Date.now()) => new Date(t).toISOString().slice(0, 13); // 'YYYY-MM-DDTHH'
+const popHours = k => Array.from({ length: k }, (_, i) => utcHour(Date.now() - i * 3600e3));
+const perHours = per => per === 'h6' ? 6 : per === 'h24' ? 24 : 0;
 let POP_T = 0, POP_NV = 0;
 const popDays = k => Array.from({ length: k }, (_, i) => utcDay(Date.now() - i * 864e5));
 const popRecs = v => (Array.isArray(v) ? v : Object.values(v || {})).filter(r => r && r.ak && r.l);
@@ -2571,7 +2577,13 @@ function popCount(it) {
   };
   if (/^https?:/i.test(it.image || '')) m[b + 'i'] = cut(it.image, 1000);
   // رفض القواعد يعني أن القارئ حُسب لهذا الخبر اليوم من جهاز آخر
-  Store.db.ref().update(m).then(() => popBump({ ak, n: 1, t: m[b + 't'], l: m[b + 'l'], s: m[b + 's'], f: m[b + 'f'], p: m[b + 'p'], i: m[b + 'i'] || '' })).catch(() => {});
+  Store.db.ref().update(m).then(() => {
+    // دفعة الساعة لـ«آخر 6/24 ساعة»: بعد نجاح عدّ اليوم فقط (فلا يُحسب القارئ مرتين)، وفي طلب منفصل كي لا يُفشل العدّ اليومي إن لم تُنشر قواعدها
+    const h = utcHour(), hb = `pop/h/${h}/${ak}/`, hm = { [`pop/vh/${h}/${ak}/${USER.uid}`]: true, [hb + 'n']: firebase.database.ServerValue.increment(1) };
+    for (const k of ['t', 'l', 's', 'f', 'p', 'i']) if (m[b + k] != null) hm[hb + k] = m[b + k];
+    Store.db.ref().update(hm).catch(() => {});
+    popBump({ ak, n: 1, t: m[b + 't'], l: m[b + 'l'], s: m[b + 's'], f: m[b + 'f'], p: m[b + 'p'], i: m[b + 'i'] || '' });
+  }).catch(() => {});
 }
 // يظهر أثر القراءة فوراً دون إعادة التحميل
 function popBump(rec) {
@@ -2579,6 +2591,7 @@ function popBump(rec) {
   const t = POP.live[utcDay()]; if (t) bump(t.list);
   if (POP.top) { bump(POP.top.day); bump(POP.top.week); }
   const fl = POP.feed[rec.f + '|' + utcDay()]; if (fl) bump(fl.list);
+  const hl = POP.hl[utcHour()]; if (hl) bump(hl.list); const hf = POP.hf[rec.f + '|' + utcHour()]; if (hf) bump(hf.list);
   POP_NV++; if (VIEW.type === 'trend' || VIEW.type === 'dash') scheduleRender();
 }
 // تحميل واحد لكل مفتاح في الوقت نفسه، ثم إعادة الرسم. وقت الكاش يُضبط قبل الطلب كي لا يتكرر عند الفشل
@@ -2604,6 +2617,18 @@ function popNeed(per, sc) {
     return void popGet('top', async () => { const v = (await Store.db.ref('pop/top').once('value')).val(); POP.top = v && v.r ? { at: v.at, d: v.d, day: topList(v, 'day', 'a'), week: topList(v, 'week', 'w') } : null; });
   }
   if (POP.load.has('top')) return;
+  if (perHours(per)) { // الساعات الماضية لا تتغير: تُحمّل مرة؛ الساعة الجارية كل 10 دقائق
+    const cur = utcHour(), ok = (c, h) => c && (h !== cur || Date.now() - c.at < POP_TTL);
+    const fk = sc && sc.type === 'feed' ? [...scopeFks(sc)][0] : null; if (sc && sc.type === 'feed' && !fk) return;
+    for (const h of popHours(perHours(per))) {
+      const store = fk ? POP.hf : POP.hl, key = fk ? fk + '|' + h : h;
+      if (ok(store[key], h)) continue;
+      store[key] = { at: Date.now(), list: [], wait: 1 };
+      const q = fk ? Store.db.ref('pop/h/' + h).orderByChild('f').equalTo(fk) : Store.db.ref('pop/h/' + h).orderByChild('n').limitToLast(40);
+      popGet('h' + key, async () => { let l = []; try { l = snapRecs(await q.once('value')); } finally { store[key] = { at: Date.now(), list: l }; } });
+    }
+    return;
+  }
   const days = popDays(per === 'week' ? 7 : 1);
   if (sc && sc.type === 'feed') {
     const fk = [...scopeFks(sc)][0]; if (!fk) return;
@@ -2628,6 +2653,15 @@ function popMerge(lists) {
 function popReads(per, sc) {
   const days = popDays(per === 'week' ? 7 : 1);
   let list, at;
+  if (perHours(per)) {
+    const fk = sc && sc.type === 'feed' ? [...scopeFks(sc)][0] : null;
+    if (sc && sc.type === 'feed' && !fk) return { ready: true, list: [], at: Date.now() };
+    const parts = popHours(perHours(per)).map(h => fk ? POP.hf[fk + '|' + h] : POP.hl[h]);
+    if (parts.some(x => !x || x.wait)) return { ready: false };
+    list = popMerge(parts.map(x => x.list)); at = Math.min(...parts.map(x => x.at));
+    if (sc && sc.type === 'folder') { const fks = scopeFks(sc); list = list.filter(r => fks.has(r.f)); }
+    return { ready: true, list: list.filter(r => r.n > 0).sort((a, b) => b.n - a.n || (b.p || 0) - (a.p || 0)).slice(0, 30), at };
+  }
   if (sc && sc.type === 'feed') {
     const fk = [...scopeFks(sc)][0], parts = days.map(d => POP.feed[fk + '|' + d]);
     if (!fk) return { ready: true, list: [], at: Date.now() };
@@ -2702,6 +2736,12 @@ const updBtn = () => `<button class="btn sm tr-upd" data-act="tr-refresh" title=
 // نص الخطأ للقارئ، ووقت آخر جمع ناجح (ok يكتبه الخادم عند النجاح فقط)
 const siteErr = e => /\b403\b/.test(e || '') ? 'الموقع يحجب الجمع الآلي' : (e || '');
 const siteOkAt = s => s.err ? (s.ok || 0) : (s.at || 0);
+// الموقع ونطاق المصدر/المجلد: يُقارن النطاق الأساسي (feeds.bbci.co.uk و bbc.co.uk و www.bbc.co.uk واحد)
+const baseDom = h => { const p = String(h || '').toLowerCase().split('.').filter(Boolean); return p.slice(p.length > 2 && p[p.length - 2].length <= 3 ? -3 : -2).join('.'); };
+function siteInScope(x, sc) {
+  if (!sc) return true; const ids = scopeFeeds(sc); if (!ids || !ids.size) return false;
+  const want = baseDom(hostOf(x.url)); return [...ids].some(id => { const f = S.feeds[id]; return [f.siteUrl, f.url].some(u => u && baseDom(hostOf(u)) === want); });
+}
 const siteList = () => Object.entries(POP.sites || {}).filter(([, s]) => s && s.on !== false && (s.items || s.err)).sort((a, b) => (a[1].o || 0) - (b[1].o || 0) || (a[1].name || '').localeCompare(b[1].name || '', 'ar'));
 // اكتشاف قائمة «الأكثر قراءة» في صفحة موقع: يُرجع المرشّحين مع محدد CSS يفهمه خادم Cloudflare (HTMLRewriter)
 const MR_RX = /(الأكثر|الاكثر)\s*(قراء|مشاهد|تداول|انتشار|شعبي|تفاعل|زيار|رواج)|يتصدر|يتصدّر|الرائج|الأكثر\s*قراءة|most[\s-]*(read|viewed|popular|shared)|trending\s*(now|news|stories)?|popular\s*(now|news|stories)/i;
@@ -2789,7 +2829,7 @@ const TR_SUB = {
   hot: 'الأخبار التي نشرها أكبر عدد من مصادرك. كلما نقلت الخبرَ مصادر أكثر صعد في الترتيب.',
   sites: 'ترتيب كل موقع لأخباره، كما يعرضه في قائمة «الأكثر قراءة» عنده. يُحدَّث كل نحو نصف ساعة، وكل 3 ساعات للمواقع التي تحجب الجمع المباشر.',
 };
-function trFill() { const d = { ...TR_DEF, ...lsGet('s24r_trend', {}) }; for (const k of Object.keys(TR_DEF)) if (VIEW[k] == null) VIEW[k] = d[k]; }
+function trFill() { const d = { ...TR_DEF, ...lsGet('s24r_trend', {}) }; for (const k of Object.keys(TR_DEF)) if (VIEW[k] == null) VIEW[k] = d[k]; VIEW.per = trPer(VIEW.per); }
 const trSave = () => lsSet('s24r_trend', { tab: VIEW.tab, per: VIEW.per, hper: VIEW.hper });
 const favOf = it => { const f = S.feeds[it.feedId] || {}; return favicon(f.siteUrl || f.url || it.link); };
 const favImg = u => `<img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">`;
@@ -2823,7 +2863,10 @@ function siteEntries(s) { return (s.items || []).slice(0, 10).map(x => ({ it: po
 function renderTrend(box) {
   trFill(); const V = VIEW; popWatch();
   if (V.scope && !scopeName(V.scope)) delete V.scope;
-  const tabs = [['read', 'الأكثر قراءة', 'eye'], ['hot', 'الأكثر تداولاً', 'copy'], ['sites', 'في المواقع', 'globe']];
+  let tabs = [['read', 'الأكثر قراءة', 'eye'], ['hot', 'الأكثر تداولاً', 'copy'], ['sites', 'في المواقع', 'globe']];
+  // «في المواقع» لمصدر أو مجلد: يظهر فقط إن كان بين مواقعه موقع نجمع قائمته
+  if (V.scope) popSitesNeed();
+  if (V.scope && POP.sites != null && !siteList().some(([, x]) => siteInScope(x, V.scope))) { tabs = tabs.slice(0, 2); if (V.tab === 'sites') V.tab = 'read'; }
   const chip = V.scope ? `<span class="tr-chip">${ico(V.scope.type === 'feed' ? 'rss' : 'folder')}<span>${esc(scopeName(V.scope))}</span><button data-act="tr-scope-x" title="كل المصادر">${ico('x')}</button></span>` : '';
   const segB = (k, opts) => `<div class="seg">${opts.map(([v, l]) => `<button data-act="tr-set" data-k="${k}" data-v="${v}" class="${V[k] === v ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   const refresh = `<button class="ibtn" data-act="tr-refresh" title="تحديث">${ico('refresh')}</button>`;
@@ -2831,23 +2874,24 @@ function renderTrend(box) {
   if (V.tab === 'read') {
     popNeed(V.per, V.scope);
     const r = popOn() ? popReads(V.per, V.scope) : null;
-    tools = chip + segB('per', [['day', 'اليوم'], ['week', '7 أيام']]) + `<span class="sp"></span>${r && r.ready && r.list.length ? `<span class="hint">حُدّث ${timeAgo(r.at)}</span>` : ''}${!(V.scope && V.scope.type === 'feed') && topNew() ? updBtn() : ''}${refresh}`;
+    tools = chip + segB('per', [['h6', 'آخر 6 ساعات'], ['h24', 'آخر 24 ساعة'], ['week', 'آخر 7 أيام']]) + `<span class="sp"></span>${r && r.ready && r.list.length ? `<span class="hint">حُدّث ${timeAgo(r.at)}</span>` : ''}${!(V.scope && V.scope.type === 'feed') && topNew() ? updBtn() : ''}${refresh}`;
     if (!popOn()) body = trEmpty('eye', 'يحتاج حساباً', 'هذا الترتيب يجمع قراءات كل المستخدمين، فيعمل فقط بعد تسجيل الدخول.');
     else if (!r.ready) body = trSkel();
     else if (!r.list.length) body = POP.err ? trEmpty('alert', 'تعذّرت قراءة الترتيب', esc(POP.err), `<button class="btn" data-act="tr-refresh">إعادة المحاولة</button>`)
-      : trEmpty('eye', V.per === 'day' ? 'لم تُسجَّل قراءات اليوم بعد' : 'لا قراءات في آخر 7 أيام', `${V.scope ? 'لم يُقرأ شيء من هذا النطاق بعد. ' : ''}كل خبر يفتحه أي مستخدم ويبقى فيه ثانيتين ونصفاً يُحسب هنا. اليوم يبدأ عند منتصف الليل بتوقيت UTC.`);
+      : trEmpty('eye', 'لا قراءات في ' + ({ h6: 'آخر 6 ساعات', h24: 'آخر 24 ساعة', week: 'آخر 7 أيام' }[V.per]), `${V.scope ? 'لم يُقرأ شيء من هذا النطاق بعد. ' : ''}كل خبر يفتحه أي مستخدم ويبقى فيه ثانيتين ونصفاً يُحسب هنا، والمدة تُعدّ من هذه اللحظة رجوعاً.`);
     else body = trBoard(r.list.map(readEntry));
   } else if (V.tab === 'hot') {
     const hrs = V.hper === 'h6' ? 6 : 24, list = popHot(hrs, V.scope);
-    tools = chip + segB('hper', [['h6', '6 ساعات'], ['h24', '24 ساعة']]) + `<span class="sp"></span><span class="hint">من ${Object.keys(S.feeds).length} مصدر تتابعه</span>`;
+    tools = chip + segB('hper', [['h6', 'آخر 6 ساعات'], ['h24', 'آخر 24 ساعة']]) + `<span class="sp"></span><span class="hint">من ${Object.keys(S.feeds).length} مصدر تتابعه</span>`;
     body = setting('dup') === 'off' ? trEmpty('copy', 'كشف الأخبار المكررة متوقف', 'هذا الترتيب يعتمد على كشف المكررات. فعّله من الإعدادات ليظهر.', `<button class="btn" data-act="settings">فتح الإعدادات</button>`)
       : list.length ? trBoard(list.map(hotEntry)) : trEmpty('copy', 'لا خبر نشرته أكثر من جهة بعد', `لم يظهر في آخر ${hrs === 6 ? '6 ساعات' : '24 ساعة'} خبر نشره مصدران أو أكثر${V.scope ? ' في هذا النطاق' : ''}. يكثر هذا مع كثرة المصادر.`);
   } else {
     popSitesNeed();
-    const L = siteList(), latest = Math.max(0, ...L.map(([, s]) => siteOkAt(s)));
+    const L = siteList().filter(([, x]) => siteInScope(x, V.scope)), latest = Math.max(0, ...L.map(([, s]) => siteOkAt(s)));
     tools = `${latest ? `<span class="hint">آخر جمع ${timeAgo(latest)}</span>` : ''}<span class="sp"></span>${sitesNew() ? updBtn() : ''}${IS_ADMIN ? `<button class="btn sm" data-act="sites-admin">${ico('gear')}إدارة المواقع</button>` : ''}${refresh}`;
     if (!popOn()) body = trEmpty('globe', 'يحتاج حساباً', 'قوائم المواقع تُقرأ من حسابك بعد تسجيل الدخول.');
     else if (POP.sites == null) body = POP.load.has('sites') ? `<div class="tr-sites">${'<div class="tr-sk" style="height:300px;border-radius:16px"></div>'.repeat(3)}</div>` : trEmpty('alert', 'تعذّرت قراءة قوائم المواقع', esc(POP.err || ''), `<button class="btn" data-act="tr-refresh">إعادة المحاولة</button>`);
+    else if (!L.length && V.scope) body = trEmpty('globe', 'لا قائمة مواقع لهذا النطاق', 'لا نجمع «الأكثر قراءة» من موقع أيٍّ من مصادر «' + esc(scopeName(V.scope)) + '».');
     else if (!L.length) body = trEmpty('globe', 'لم تُضف مواقع بعد', IS_ADMIN ? 'أضف موقعاً يعرض قائمة «الأكثر قراءة» في صفحته، فيجمعها الخادم كل 10 دقائق ويراها كل المستخدمين.' : 'سيظهر هنا ترتيب المواقع لأخبارها بعد أن يضيفها المدير.', IS_ADMIN ? `<button class="btn pri" data-act="sites-admin">${ico('plus')}إضافة موقع</button>` : '');
     else body = `<div class="tr-sites">${L.map(([k, s]) => `<section class="tr-site" data-w="site:${esc(k)}"><div class="tr-sh">${favImg(favicon(s.url))}<h3>${esc(s.name || hostOf(s.url))}</h3>
         <span class="dw-c${s.err ? ' bad' : ''}" title="${esc(s.err || '')}">${s.err ? 'تعذّر آخر جمع' : s.at ? timeAgo(s.at) : ''}</span><span class="sp"></span>${IS_ADMIN && trendsUrl() ? `<button class="ibtn" data-act="tr-site-run" data-k="${esc(k)}" title="اجمع هذا الموقع الآن">${ico('refresh')}</button>` : ''}<a class="ibtn" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" title="فتح الموقع">${ico('ext')}</a></div>
@@ -2867,9 +2911,9 @@ function trendWidget() {
   const tabs = `<div class="seg dw-tabs">${[['read', 'الأكثر قراءة'], ['hot', 'الأكثر تداولاً'], ['sites', 'في المواقع']].map(([k, l]) => `<button data-act="dw-trend" data-v="${k}" class="${t === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   let body;
   if (t === 'read') {
-    popNeed('day'); const r = popOn() ? popReads('day') : null;
+    popNeed('h24'); const r = popOn() ? popReads('h24') : null;
     body = !popOn() ? `<div class="dw-e">يحتاج حساباً.</div>` : !r.ready ? `<div class="dw-e">جارٍ التحميل…</div>`
-      : r.list.length ? (E => `<ol class="tr-list mini">${E.map((e, i) => trRow(e, i, max(E))).join('')}</ol>`)(r.list.slice(0, 5).map(readEntry)) : `<div class="dw-e">لم تُسجَّل قراءات اليوم بعد.</div>`;
+      : r.list.length ? (E => `<ol class="tr-list mini">${E.map((e, i) => trRow(e, i, max(E))).join('')}</ol>`)(r.list.slice(0, 5).map(readEntry)) : `<div class="dw-e">لا قراءات في آخر 24 ساعة.</div>`;
   } else if (t === 'hot') {
     const E = popHot(24).slice(0, 5).map(hotEntry);
     body = E.length ? `<ol class="tr-list mini">${E.map((e, i) => trRow(e, i, max(E))).join('')}</ol>` : `<div class="dw-e">لا خبر نشره مصدران أو أكثر في آخر 24 ساعة.</div>`;
@@ -2987,6 +3031,8 @@ function popPrune() {
   lsSet('s24r_popprune', utcDay());
   const m = {}; for (let i = 8; i <= 30; i++) { const d = utcDay(Date.now() - i * 864e5); m['pop/d/' + d] = null; m['pop/v/' + d] = null; }
   Store.db.ref().update(m).catch(() => {});
+  const mh = {}; for (let i = 30; i <= 24 * 8; i++) { const h = utcHour(Date.now() - i * 3600e3); mh['pop/h/' + h] = null; mh['pop/vh/' + h] = null; } // الساعات: يكفي آخر 24، ويُحذف ما بعد 30 (طلب منفصل)
+  Store.db.ref().update(mh).catch(() => {});
 }
 
 /* =========================================================
@@ -3279,7 +3325,7 @@ function mSheet() {
     + (isSaved ? '' : `<div class="ms-h">الإظهار</div><div class="ms-r">${pill('lf', 'all', lf === 'all', 'الكل')}${pill('lf', 'unread', lf === 'unread', 'غير المقروء')}</div>`)
     + `<div class="ms-h">الترتيب</div><div class="ms-r">${pill('m-sort', 'new', so !== 'old', 'الأحدث أولاً')}${pill('m-sort', 'old', so === 'old', 'الأقدم أولاً')}</div>`;
   if (!isSaved) h += `<button class="ms-a" data-act="mark-all">${ico('checks')}تعليم الكل كمقروء</button>`;
-  if (VIEW.type === 'feed' || VIEW.type === 'folder') h += `<button class="ms-a" data-act="trend-scope" data-t="${VIEW.type}" data-id="${esc(VIEW.id)}">${ico('flame')}الأكثر قراءة هنا</button>`;
+  if (['feed', 'folder', 'all'].includes(VIEW.type)) h += `<button class="ms-a" data-act="trend-scope" data-t="${VIEW.type}" data-id="${esc(VIEW.id || '')}">${ico('flame')}${trScopeTitle()}</button>`;
   if (VIEW.type === 'feed') h += `<button class="ms-a" data-act="feed-menu" data-id="${esc(VIEW.id)}">${ico('gear')}خيارات المصدر</button>`;
   if (VIEW.type === 'tag') h += `<button class="ms-a" data-act="tag-menu" data-id="${esc(VIEW.id)}">${ico('gear')}خيارات الوسم</button>`;
   if (VIEW.type === 'rule') h += `<button class="ms-a" data-act="rule-edit" data-id="${esc(VIEW.id)}">${ico('pen')}تعديل الفلتر</button>`;
@@ -3999,7 +4045,7 @@ document.addEventListener('click', async e => {
       case 'dash-custom': dashCustom(); break;
       case 'tr-set': VIEW[t.dataset.k] = t.dataset.v; trSave(); renderList(); if (t.dataset.k === 'tab') $('#dash').scrollTop = 0; break;
       case 'tr-scope-x': delete VIEW.scope; renderList(); break;
-      case 'trend-scope': trFill(); setView({ type: 'trend', tab: 'read', per: VIEW.per || lsGet('s24r_trend', {}).per || 'day', scope: { type: t.dataset.t, id } }); break;
+      case 'trend-scope': { const d = { ...TR_DEF, ...lsGet('s24r_trend', {}) }; setView({ type: 'trend', tab: 'read', per: trPer(d.per), hper: d.hper, ...(t.dataset.t === 'all' ? {} : { scope: { type: t.dataset.t, id } }) }); break; }
       case 'tr-refresh': if (Date.now() - (POP.rf || 0) < 20000 && !sitesNew() && !topNew()) { toast('حُدّث قبل لحظات'); break; } POP.rf = Date.now(); POP.topAt = 0; POP.sitesAt = 0; POP.live = {}; POP.feed = {}; renderList(); break;
       case 'dw-trend': lsSet('s24r_dwtr', t.dataset.v); renderList(); break;
       case 'sites-admin': sitesAdmin(); break;
