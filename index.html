@@ -1409,7 +1409,7 @@ async function refreshFeed(feedId) {
     FEED_SIG[feedId] = sig; IDB.put({ feedId, items, fetchedAt: now, sig });
     FEED_STATUS[feedId] = { fetchedAt: now, error: '', loading: false };
     if (fresh.length) applyRuleActions(fresh);
-    if (TOUCHED && !MANUAL && prevMap.size > fresh.length) fresh.forEach(it => HELD.add(it.id)); // مصدر جديد بلا أخبار سابقة يدخل مباشرة
+    if (TOUCHED && !MANUAL && BOOTED && $('#items').scrollTop > 60 && prevMap.size > fresh.length) fresh.forEach(it => HELD.add(it.id)); // لا حجز في أول تحديث بعد الفتح ولا والقارئ في أعلى القائمة؛ ومصدر جديد بلا أخبار سابقة يدخل مباشرة
     if (feed.type === 'html') { items.filter(it => it.est && !it.dChk).slice(0, 30).forEach(it => DATE_Q.push(it.id)); datePump(); }
   } catch (e) {
     FEED_STATUS[feedId] = { ...(FEED_STATUS[feedId] || {}), error: e.message, loading: false };
@@ -1425,10 +1425,11 @@ function setPause(id, ms) { Store.write('feeds/' + id + '/paused', ms == null ? 
 let _rfT = 0, _rfAt = 0;
 // الأخبار الجديدة بعد أن يبدأ القارئ التصفح تُحجز (HELD) ولا تدخل القائمة حتى يضغط زر «N خبراً جديداً»، فلا تتحرك البطاقات تحت يده.
 // TOUCHED: لمس القائمة (تمرير/مؤشر/فتح خبر) منذ آخر انتقال. MANUAL: تحديث طلبه بنفسه (⟳ أو r) فيدخل الجديد مباشرة.
-const HELD = new Set(); let TOUCHED = false, MANUAL = false;
+const HELD = new Set(); let TOUCHED = false, MANUAL = false, BOOTED = false; // BOOTED: انتهى أول تحديث بعد فتح التطبيق
 function manualRefresh() { HELD.clear(); scheduleRender(); MANUAL = true; if (!REFRESHING) refreshAll().finally(() => { MANUAL = false; }); }
 function showNew() { HELD.clear(); renderList(); $('#items').scrollTop = 0; }
 ['wheel', 'touchstart', 'pointerdown', 'pointermove', 'keydown'].forEach(ev => $('#items').addEventListener(ev, () => { TOUCHED = true; }, { passive: true }));
+$('#items').addEventListener('scroll', e => { if (HELD.size && e.target.scrollTop < 5) { HELD.clear(); scheduleRender(); } }, { passive: true }); // عاد إلى أعلى القائمة: يدخل المحجوز وحده
 function refreshRender() { if (_rfT) return; _rfT = setTimeout(() => { _rfT = 0; _rfAt = Date.now(); scheduleRender(); }, Math.max(0, 700 - (Date.now() - _rfAt))); }
 async function refreshAll() {
   if (REFRESHING) return;
@@ -1443,7 +1444,7 @@ async function refreshAll() {
   const mine = id => VIEW.type === 'feed' ? VIEW.id === id : VIEW.type === 'folder' ? inFolder(S.feeds[id].folder, VIEW.id) : false;
   const q = ids.map(id => [id, mine(id) ? 0 : 1, (FEED_STATUS[id] || {}).fetchedAt || 0]).sort((a, b) => a[1] - b[1] || a[2] - b[2]).map(x => x[0]);
   await Promise.all(Array.from({ length: Math.min(CONFIG.CONCURRENCY, q.length) }, async () => { while (q.length) await refreshFeed(q.shift()); }));
-  REFRESHING = false; MANUAL = false; $$('.refresh-ico').forEach(e => e.classList.remove('spin'));
+  REFRESHING = false; MANUAL = false; BOOTED = true; $$('.refresh-ico').forEach(e => e.classList.remove('spin'));
   lsSet('s24r_last_refresh', Date.now());
   // شرط «نقلته N مصادر» لا يكتمل إلا بعد وصول كل المصادر، فتُعاد القواعد التي فيه على الأخبار الحديثة غير المقروءة
   if (activeRules().some(r => r.dupMin > 1)) { const since = Date.now() - DUP_WIN; applyRuleActions([...ITEMS.values()].filter(it => S.feeds[it.feedId] && !isRead(it.id) && it.date >= since), { post: true }); }
